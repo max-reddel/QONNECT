@@ -17,7 +17,7 @@ class GenericAgent(Agent):
         - OEM
         - LogisticCompany
         - Garages
-    TODO: Shoul CarManufacturers follow this style as well or would they need to be modeled differently?
+    TODO: Should CarManufacturers follow this style as well or would they need to be modeled differently?
     TODO: Other agents such as User, ARN, and CarDesigner should follow a different structure.
     """
 
