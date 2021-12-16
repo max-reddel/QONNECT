@@ -19,7 +19,7 @@ class Preferences:
         """
         self.agent = agent
         self.suppliers = suppliers
-        self.indices = [x for x in Material]
+        self.indices = [x for x in Component]
 
         self.data = pd.DataFrame(columns=self.suppliers, index=self.indices)
         for supplier in self.suppliers:
@@ -28,7 +28,7 @@ class Preferences:
     def compute_priorities_for_one_supplier(self, supplier):
         """
         Compute all priority values for a supplier.
-        :param supplier: GenericAgent: an agent that supplies the current agent with material.
+        :param supplier: Agent: an agent that supplies the current agent with material.
         :return:
             supplier_priorities: Pandas Series: represents a column in a dataframe
         """
@@ -38,9 +38,9 @@ class Preferences:
         supplier_priorities = pd.Series(index=self.indices)
 
         prices = supplier.get_prices()
-        materials = list(prices.keys())
+        components = list(prices.keys())
 
-        for material in materials:
-            supplier_priorities[material] = prices[material]
+        for component in components:
+            supplier_priorities[component] = prices[component]
 
         return supplier_priorities
