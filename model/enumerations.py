@@ -9,7 +9,7 @@ class CarState(Enum):
     FUNCTIONING = 1
 
 
-class PlasticType(Enum):
+class Material(Enum):
     """
     Kinds of plastics.
     """
@@ -17,3 +17,4 @@ class PlasticType(Enum):
     VIRGIN = 1
     RECYCLATE_LOW = 2
     RECYCLATE_HIGH = 3
+    CAR = 4

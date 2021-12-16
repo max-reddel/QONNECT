@@ -18,7 +18,6 @@ class GenericAgent(Agent):
         - LogisticCompany
         - Garages
     TODO: Should CarManufacturers follow this style as well or would they need to be modeled differently?
-    TODO: Other agents such as User, ARN, and CarDesigner should follow a different structure.
     """
 
     def __init__(self, unique_id, model, all_agents):
@@ -31,42 +30,52 @@ class GenericAgent(Agent):
         self.all_agents = all_agents
         self.unique_name = f'{self.__class__.__name__}_{unique_id}'  # This is optional
 
-        # Percentual constraints given by law or car designers
+        # Minimum constraints given by law or car designers
         self.constraints = {
-            PlasticType.VIRGIN: 0.7,
-            PlasticType.REUSE: 0.0,
-            PlasticType.RECYCLATE_LOW: 0.1,
-            PlasticType.RECYCLATE_HIGH: 0.2}
+            Material.REUSE: 0.0,
+            Material.VIRGIN: 0.0,
+            Material.RECYCLATE_LOW: 0.0,
+            Material.RECYCLATE_HIGH: 0.0}
 
-        # Prices for specific plastic types
+        # Prices for specific materials
         self.prices = {
-            PlasticType.REUSE: math.inf,
-            PlasticType.VIRGIN: math.inf,
-            PlasticType.RECYCLATE_LOW: math.inf,
-            PlasticType.RECYCLATE_HIGH: math.inf}
+            Material.REUSE: math.inf,
+            Material.VIRGIN: math.inf,
+            Material.RECYCLATE_LOW: math.inf,
+            Material.RECYCLATE_HIGH: math.inf}
 
-        # Stock of specific plastic types
+        # Stock of specific materials
         self.stock = {
-            PlasticType.REUSE: 0.0,
-            PlasticType.VIRGIN: 0.0,
-            PlasticType.RECYCLATE_LOW: 0.0,
-            PlasticType.RECYCLATE_HIGH: 0.0}
+            Material.REUSE: 0.0,
+            Material.VIRGIN: 0.0,
+            Material.RECYCLATE_LOW: 0.0,
+            Material.RECYCLATE_HIGH: 0.0}
+
+        # Demand of specific materials
+        self.demand = {
+            Material.REUSE: 0.0,
+            Material.VIRGIN: 0.0,
+            Material.RECYCLATE_LOW: 0.0,
+            Material.RECYCLATE_HIGH: 0.0}
 
     def get_prices(self):
         """
         Getter for prices.
         :return:
-            self.prices: dictionary with {PlasticType: float}
+            self.prices: dictionary with {Material: float}
         """
         return self.prices
 
-    def offer_preferences(self):
+    def update_suppliers(self):
+        pass
+
+    def initialize_transaction(self):
         """
         First stage of the agent step: compute agent's preferences.
         """
         pass
 
-    def satisfy_preferences(self):
+    def finalize_transaction(self):
         """
         Second stage of the agent step: satisfy agent's preferences as far as possible.
         """
@@ -86,21 +95,29 @@ class PartsManufacturer(GenericAgent):
         """
         super().__init__(unique_id, model, all_agents)
         self.demand = {
-            PlasticType.VIRGIN: self.random.normalvariate(10.0, 2),
-            PlasticType.RECYCLATE_LOW: self.random.normalvariate(2.0, 0.2),
-            PlasticType.RECYCLATE_HIGH: self.random.normalvariate(8.0, 2)}
+            Material.REUSE: 0,
+            Material.VIRGIN: self.random.normalvariate(10.0, 2),
+            Material.RECYCLATE_LOW: self.random.normalvariate(2.0, 0.2),
+            Material.RECYCLATE_HIGH: self.random.normalvariate(8.0, 2)}
 
-    def offer_preferences(self):
+    def initialize_transaction(self):
         """
         First stage of the agent step: compute agent's preferences.
         """
         suppliers = self.all_agents[MinerRefiner] + self.all_agents[Shredder]
         self.preferences = Preferences(agent=self, suppliers=suppliers)
+        self.update_suppliers(suppliers)
 
-    def satisfy_preferences(self):
+    def finalize_transaction(self):
         """
         Second stage of the agent step: satisfy agent's preferences as far as possible.
         """
+        pass
+
+    def update_suppliers(self, suppliers):
+
+        # for s in suppliers:
+        #     s.
         pass
 
 
@@ -109,16 +126,16 @@ class MinerRefiner(GenericAgent):
     def __init__(self, unique_id, model, all_agents):
         super().__init__(unique_id, model, all_agents)
 
-        self.stock[PlasticType.VIRGIN] = self.random.normalvariate(10.0, 2)
-        self.prices[PlasticType.VIRGIN] = self.random.normalvariate(2.5, 0.2)  # cost per unit
+        self.stock[Material.VIRGIN] = self.random.normalvariate(10.0, 2)
+        self.prices[Material.VIRGIN] = self.random.normalvariate(2.5, 0.2)  # cost per unit
 
-    def offer_preferences(self):
+    def initialize_transaction(self):
         """
         First stage of the agent step: compute agent's preferences.
         """
         pass
 
-    def satisfy_preferences(self):
+    def finalize_transaction(self):
         """
         Second stage of the agent step: satisfy agent's preferences as far as possible.
         """
@@ -138,19 +155,19 @@ class Shredder(GenericAgent):
         """
         super().__init__(unique_id, model, all_agents)
 
-        self.stock[PlasticType.RECYCLATE_LOW] = self.random.normalvariate(10.0, 2)
-        self.stock[PlasticType.RECYCLATE_HIGH] = self.random.normalvariate(10.0, 2)
+        self.stock[Material.RECYCLATE_LOW] = self.random.normalvariate(10.0, 2)
+        self.stock[Material.RECYCLATE_HIGH] = self.random.normalvariate(10.0, 2)
 
-        self.prices[PlasticType.RECYCLATE_LOW] = self.random.normalvariate(2.5, 0.2)  # cost per unit
-        self.prices[PlasticType.RECYCLATE_HIGH] = self.random.normalvariate(2.5, 0.2)  # cost per unit
+        self.prices[Material.RECYCLATE_LOW] = self.random.normalvariate(2.5, 0.2)  # cost per unit
+        self.prices[Material.RECYCLATE_HIGH] = self.random.normalvariate(2.5, 0.2)  # cost per unit
 
-    def offer_preferences(self):
+    def initialize_transaction(self):
         """
         First stage of the agent step: compute agent's preferences.
         """
         pass
 
-    def satisfy_preferences(self):
+    def finalize_transaction(self):
         """
         Second stage of the agent step: satisfy agent's preferences as far as possible.
         """

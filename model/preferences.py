@@ -19,7 +19,7 @@ class Preferences:
         """
         self.agent = agent
         self.suppliers = suppliers
-        self.indices = [x for x in PlasticType]
+        self.indices = [x for x in Material]
 
         self.data = pd.DataFrame(columns=self.suppliers, index=self.indices)
         for supplier in self.suppliers:

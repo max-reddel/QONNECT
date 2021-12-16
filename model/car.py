@@ -1,5 +1,5 @@
 """
-This module contains the Car class.
+This module contains the CAR class.
 """
 
 from model.enumerations import *
@@ -7,7 +7,7 @@ from model.enumerations import *
 
 class Car:
     """
-    The Car class.
+    The CAR class.
     TODO: This is just a start. This needs to be elaborated on.
     """
 
