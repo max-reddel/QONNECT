@@ -125,6 +125,15 @@ Figure 2 shows what an instance of the `Car` class can look like. Additionally, 
 
 ## 5. XLRM
 
+The XLRM framework describes the analysis of a model by distinguishing:
+
+- X: Uncertainty variables which define the Scenarios
+- L: Lever varaibles which define the policies or solutions
+- R: Relations which describe the inner working of the model
+- M: Metrics which define the key performance indicators (KPIs)
+
+The following sub-sections describe these in more detail.
+
 ### 5.1 KPIs
 ### 5.2 Policies
 ### 5.3 Scenarios
