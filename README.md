@@ -1,10 +1,8 @@
 # The CEPAI Model
 
-## The Circular Economy of Plastic in the Automotive Industry Model
+The Circular Economy of Plastic in the Automotive Industry (CEPAI) Model is an agent-based simulation model that concerns the circular economy of plastic in the automotive industry within the Netherlands. 
 
-This is an agent-based simulation model that concerns the circular economy of plastic in the automotive industry. 
-
-## Contributors:
+## Contributors
 - Max Reddel
 - Felicitas Reddel
 - Anmol Soni
@@ -83,14 +81,16 @@ The `model` directory contains all model relevant components, including the main
 
 Every single agent inherits its attributes and methods from `GenericAgent`. A list of these agents is provided in the following table.
 
+(The values in the `Count` column are only suggestions for now.)
+
 | Agent Type        | Count | Description                                                                                                   |
 |-------------------|-------|---------------------------------------------------------------------------------------------------------------|
 | `User`              | 1000  | A user of a car.                                                                                              |
 | `CarManufacturer`   | 4     | A facility that manufatures cars of a specific car brand with brand ϵ {VW, GM, Toyota, Mercedes}.                          |
 | `PartsManufacturer` | 10    | A facility (= parts manufacturer or original equipment manufacturer) who takes plastic in and produces parts. |
-| `Refiner`           | 10    | A facility (= miners and refiners) that produces virgin plastic.                                              |
+| `Refiner`           | 6    | A facility (= miners and refiners) that produces virgin plastic.                                              |
 | `Recycler`          | 4     | A facility (= shredder and post-shredder) that creates recyclate.                                             |
-| `Dismantler`        | 4     | A facility that dismantles cars.                                                                              |
+| `Dismantler`        | 2     | A facility that dismantles cars.                                                                              |
 | `Garage`            | 20    | A facility that repairs cars or sends them for final processing.                                              |
 <figcaption align = "center"><b>Tab.1 - Agents</b></figcaption>
 
