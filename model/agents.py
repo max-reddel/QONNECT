@@ -81,14 +81,6 @@ class GenericAgent(Agent):
             Component.RECYCLATE_HIGH: 0.0
         }
 
-    def step(self):
-        """
-        Step method: buy components, manufacture other components, adjust demand for next round.
-        """
-        self.get_all_components()
-        self.process_components()
-        self.update_demand()
-
     def get_all_components(self):
         """
         Determine the order of suppliers by personal preference and then buy components.
@@ -361,8 +353,8 @@ class CarManufacturer(GenericAgent):
 
 class User(GenericAgent):
     """
-    This agent was used to validate the car buying behavior.
-    # TODO: Further implementation is needed
+    This agent was used to validate the car buying behavior. Currently, a user buys a car at each instant.
+    # TODO: Changes are needed.
     """
 
     def __init__(self, unique_id, model, all_agents):

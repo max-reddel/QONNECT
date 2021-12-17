@@ -3,7 +3,7 @@ This module contains the plastic model which concerns the circular economy of pl
 """
 
 from mesa import Model
-from mesa.time import RandomActivation
+from mesa.time import StagedActivation
 from model.agents import *
 
 
@@ -32,9 +32,7 @@ class CEPAIModel(Model):
             self.agent_counts = agent_counts
             self.agent_counts[CarManufacturer] = len(self.brands)
 
-        # Separate schedules for diffenent agent types
-        self.schedules = {agent_type: RandomActivation(self) for agent_type in GenericAgent.__subclasses__()}
-        self.schedule_order = [User, CarManufacturer, PartsManufacturer, Refiner, Recycler, Dismantler, Garage]
+        self.schedule = StagedActivation(self, stage_list=["get_all_components", "process_components", "update_demand"])
 
         self.all_agents = self.create_all_agents()
 
@@ -66,7 +64,7 @@ class CEPAIModel(Model):
                     new_agent = agent_type(self.next_id(), self, all_agents, self.get_next_brand())
                 else:
                     new_agent = agent_type(self.next_id(), self, all_agents)
-                self.schedules[agent_type].add(new_agent)
+                self.schedule.add(new_agent)
                 if agent_type in all_agents:
                     all_agents[agent_type].append(new_agent)
                 else:
@@ -77,5 +75,4 @@ class CEPAIModel(Model):
         """
         Executes a model step.
         """
-        for agent_type in self.schedule_order:
-            self.schedules[agent_type].step()
+        self.schedule.step()

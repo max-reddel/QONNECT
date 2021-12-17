@@ -38,7 +38,7 @@ This is a project for the course SEN9120 Advanced Agent Based Modelling (2021/22
 
 We ran into quite some problems with the two-stage-process of the agents. The potential solutions were not pretty. One such solution would have consisted in creating something like a `MarketAgent` which would take care of determining who gets what components from whom. Additional stages would have been necessary as well for this. To keep the design simple, we went back to square one and created a new design.
 
-Now, there is only one stage. The `GenericAgent` has a `step()` method in which three sub-steps will be executed:
+Now, the `GenericAgent` has the following three stages:
 - `get_all_components()` which gets or buys components from the agent's corresponding suppliers.
 - `process_components()` which manufactures, uses, or repairs specific components.
 - `update_demand()` which updates the agent's demand for the next instant.
