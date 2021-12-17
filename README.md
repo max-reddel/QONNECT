@@ -83,12 +83,12 @@ Every single agent inherits its attributes and methods from `GenericAgent`. A li
 
 (The values in the `Count` column are only suggestions for now.)
 
-| Agent Type        | Count | Description                                                                                                   |
-|-------------------|-------|---------------------------------------------------------------------------------------------------------------|
+| Agent Type          | Count | Description                                                                                                   |
+|---------------------|-------|---------------------------------------------------------------------------------------------------------------|
 | `User`              | 1000  | A user of a car.                                                                                              |
-| `CarManufacturer`   | 4     | A facility that manufatures cars of a specific car brand with brand ϵ {VW, GM, Toyota, Mercedes}.                          |
+| `CarManufacturer`   | 4     | A facility that manufatures cars of a specific car brand with brand ϵ {VW, GM, Toyota, Mercedes}.             |
 | `PartsManufacturer` | 10    | A facility (= parts manufacturer or original equipment manufacturer) who takes plastic in and produces parts. |
-| `Refiner`           | 6    | A facility (= miners and refiners) that produces virgin plastic.                                              |
+| `Refiner`           | 6    | A facility (= miners and refiners) that produces virgin plastic.                                               |
 | `Recycler`          | 4     | A facility (= shredder and post-shredder) that creates recyclate.                                             |
 | `Dismantler`        | 2     | A facility that dismantles cars.                                                                              |
 | `Garage`            | 20    | A facility that repairs cars or sends them for final processing.                                              |
@@ -106,8 +106,8 @@ Figure 1 shows the various agents in this network and how several kinds of compo
 
 The enumeration `Component` defines that there are different kinds of plastics, but also parts and cars. This comes in handy when dealing with polymorphic methods that handle stock and demand. The table below shows the different values in the first column. For the plastics, it is the case that both data types for stock and demand are floats. We refer here to mass in e.g., kilogram or tonnes. The data types for `PARTS` and `CARS` differs. A `Part` is a custom-made object that consists of a ratio of plastics and a state `PartState` which is either `STANDARD` or `REUSED`. A `Car` consist mainly of a number of `Part`s. So, the stocks for these two components are lists because they contain these objects. Their demand data types are integers, however. And this has to be adjusted further! 
 
-| Component      | Stock Data Type | Demand Data Type |
-|----------------|-----------------|------------------|
+| Component        | Stock Data Type | Demand Data Type |
+|------------------|-----------------|------------------|
 | `VIRGIN`         | float           | float            |
 | `RECYCLATE_LOW`  | float           | float            |
 | `RECYCLATE_HIGH` | float           | float            |
