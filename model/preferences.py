@@ -2,7 +2,6 @@
 This module contains the Preferences class.
 """
 
-# from queue import PriorityQueue  # Inteded to be used during agent.satisfy_preferences()
 import pandas as pd
 from model.enumerations import *
 
@@ -32,14 +31,12 @@ class Preferences:
         :return:
             supplier_priorities: Pandas Series: represents a column in a dataframe
         """
-        # TODO: actual priority values need to be elaborated on to include other decision variables
         # TODO: current implementation is limited to price only
+        # TODO: actual priority values need to be elaborated on to include other decision variables
 
         supplier_priorities = pd.Series(index=self.indices)
-
         prices = supplier.get_prices()
         components = list(prices.keys())
-
         for component in components:
             supplier_priorities[component] = prices[component]
 

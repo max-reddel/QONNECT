@@ -30,7 +30,7 @@ class CarState(Enum):
 
 class Brand(Enum):
     """
-    Kinds of car brands.
+    Kinds of car brands. We can rename them and/or change how many we want.
     """
     VW = 0
     GM = 1
