@@ -9,7 +9,7 @@ from model.enumerations import *
 
 class Car:
     """
-    The CARS class.
+    The Car class.
     TODO: This is just a start. This needs to be elaborated on.
     """
 

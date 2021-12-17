@@ -7,7 +7,7 @@ from mesa.time import RandomActivation
 from model.agents import *
 
 
-class PlasticModel(Model):
+class CEPAIModel(Model):
     """
     The model which concerns the circular economy of plastic in the automotive industry.
     """
@@ -16,7 +16,7 @@ class PlasticModel(Model):
         """
         :param agent_counts: dictionary with {Agent: int}
         """
-        print('Simulation started...')
+        print('Simulation starting...')
         super().__init__()
         self.brands = {brand: False for brand in Brand}
 
@@ -24,7 +24,7 @@ class PlasticModel(Model):
             self.agent_counts = {
                 PartsManufacturer: 3,
                 Refiner: 3,
-                PostShredder: 2,
+                Recycler: 2,
                 CarManufacturer: len(self.brands),
                 User: 1
             }
@@ -34,7 +34,7 @@ class PlasticModel(Model):
 
         # Separate schedules for diffenent agent types
         self.schedules = {agent_type: RandomActivation(self) for agent_type in GenericAgent.__subclasses__()}
-        self.schedule_order = [User, CarManufacturer, PartsManufacturer, Refiner, PostShredder, Dismantler, Garage]
+        self.schedule_order = [User, CarManufacturer, PartsManufacturer, Refiner, Recycler, Dismantler, Garage]
 
         self.all_agents = self.create_all_agents()
 

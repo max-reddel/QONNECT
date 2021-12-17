@@ -4,7 +4,7 @@ This module contains all agent classes.
 
 from mesa import Agent
 from model.preferences import *
-from model.components import *
+from model.bigger_components import *
 import math
 
 
@@ -12,7 +12,7 @@ class GenericAgent(Agent):
     """
     This agent is a generic agent. Its descendants are:
         - Refiner
-        - PostShredder
+        - Recycler
         - PartsManufacturer/OEM
         - CarManufacturer
         - Garage
@@ -23,7 +23,7 @@ class GenericAgent(Agent):
     def __init__(self, unique_id, model, all_agents):
         """
         :param unique_id: int
-        :param model: PlasticModel
+        :param model: CEPAIModel
         :param all_agents: dictionary with {Agent: list of Agents}
         """
         super().__init__(unique_id, model)
@@ -86,7 +86,7 @@ class GenericAgent(Agent):
         Step method: buy components, manufacture other components, adjust demand for next round.
         """
         self.get_all_components()
-        self.process_goods()
+        self.process_components()
         self.update_demand()
 
     def get_all_components(self):
@@ -200,7 +200,7 @@ class GenericAgent(Agent):
         """
         return self.prices
 
-    def process_goods(self):
+    def process_components(self):
         """
         Process goods (manufactuging, shredding, using, or repairing).
         """
@@ -240,7 +240,7 @@ class PartsManufacturer(GenericAgent):
     def __init__(self, unique_id, model, all_agents):
         """
         :param unique_id: int
-        :param model: PlasticModel
+        :param model: CEPAIModel
         :param all_agents: dictionary with {Agent: list of Agents}
         """
         super().__init__(unique_id, model, all_agents)
@@ -264,7 +264,7 @@ class PartsManufacturer(GenericAgent):
         """
 
         refiners = self.all_agents[Refiner]
-        post_shredders = self.all_agents[PostShredder]
+        post_shredders = self.all_agents[Recycler]
 
         refiners = self.get_sorted_suppliers(suppliers=refiners, component=Component.VIRGIN)
         self.get_component_from_suppliers(suppliers=refiners, component=Component.VIRGIN)
@@ -291,15 +291,15 @@ class Refiner(GenericAgent):
         pass
 
 
-class PostShredder(GenericAgent):
+class Recycler(GenericAgent):
     """
-    PostShredder and Postshredder agent.
+    Recycler and Postshredder agent.
     """
 
     def __init__(self, unique_id, model, all_agents):
         """
         :param unique_id: int
-        :param model: PlasticModel
+        :param model: CEPAIModel
         :param all_agents: dictionary with {Agent: list of Agents}
         """
         super().__init__(unique_id, model, all_agents)
@@ -326,7 +326,7 @@ class CarManufacturer(GenericAgent):
     def __init__(self, unique_id, model, all_agents, brand):
         """
         :param unique_id: int
-        :param model: PlasticModel
+        :param model: CEPAIModel
         :param all_agents: dictionary with {Agent: list of Agents}
         """
         super().__init__(unique_id, model, all_agents)
@@ -351,7 +351,7 @@ class CarManufacturer(GenericAgent):
         parts_manufacturers = self.get_sorted_suppliers(suppliers=self.parts_manufacturers, component=Component.PARTS)
         self.get_component_from_suppliers(suppliers=parts_manufacturers, component=Component.PARTS)
 
-    def process_goods(self):
+    def process_components(self):
         """
         Manufacture specific amount of cars.
         """
@@ -368,7 +368,7 @@ class User(GenericAgent):
     def __init__(self, unique_id, model, all_agents):
         """
          :param unique_id: int
-         :param model: PlasticModel
+         :param model: CEPAIModel
          :param all_agents: dictionary with {Agent: list of Agents}
          """
         super().__init__(unique_id, model, all_agents)
@@ -395,7 +395,7 @@ class Garage(GenericAgent):
     def __init__(self, unique_id, model, all_agents):
         """
          :param unique_id: int
-         :param model: PlasticModel
+         :param model: CEPAIModel
          :param all_agents: dictionary with {Agent: list of Agents}
          """
         super().__init__(unique_id, model, all_agents)
@@ -410,7 +410,7 @@ class Dismantler(GenericAgent):
     def __init__(self, unique_id, model, all_agents):
         """
          :param unique_id: int
-         :param model: PlasticModel
+         :param model: CEPAIModel
          :param all_agents: dictionary with {Agent: list of Agents}
          """
         super().__init__(unique_id, model, all_agents)
