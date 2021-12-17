@@ -34,7 +34,7 @@ This is a project for the course SEN9120 Advanced Agent Based Modelling (2021/22
 
 ## 2. Current State of the Project
 
-## 2.1 Stages and Steps
+### 2.1 Changes in Stages and Steps
 
 We ran into quite some problems with the two-stage-process of the agents. The potential solutions were not pretty. One such solution would have consisted in creating something like a `MarketAgent` which would take care of determining who gets what components from whom. Additional stages would have been necessary as well for this. To keep the design simple, we went back to square one and created a new design.
 
@@ -43,16 +43,26 @@ Now, the `GenericAgent` has the following three stages:
 - `process_components()` which manufactures, uses, or repairs specific components.
 - `update_demand()` which updates the agent's demand for the next instant.
 
-### Example
+#### Example
 Let's say for instance, a `PartsManufacturer` `pm1` is activated. This agent wants first to buy plastic from the `Refiner`s and `Recycler`s. The agent `pm1` will compute its preferences and thus determine to which supplier `pm1` wants to go to first to attempt to buy a specific kind of plastic. Then, it will go through the suppliers according to these preferences. When `pm1` is done with buying all plastic that it demands, it can execute the second step. Now, `pm1` will manufacture parts out of plastic. In the last step, `pm1` will adjust its demand for the next instant. When `pm1` is all done, the next `PartsManufacturer` can be activated and so on. 
 
-## 2.2 Components
+### 2.2 Changes in Components
 
 Earlier, we had `PlasticType` where we had `REUSE`, `VIRGIN`, `RECYCLATE_LOW`, and `RECYCLATE_HIGH`. However, we needed to restructure a bit as we also want to include parts and cars. For this purpose, we have now components (see section on [Cars and Parts](#44-the-composition-of-cars-and-parts)).
 
-## 2.3 Agents
+### 2.3 Changes in Agents
 
 Agents have also received some adjustment treatment. `CarDesigner`s and `LogisticCompany`s have been kicked out completely (see section on [Agents](#41-agents)). The reasons for excluding the latter one lies in the fact that a `LogisticCompany` does not do much. It is only receiving `Part`s but not processing them at all. The idea is now to aggregate them away and have a direct connection between the `PartsManufacturer`s and the `Garage`s.
+
+### 2.4 Still to do
+
+1. Add more details to the following agents:
+   - `Dismantler`
+   - `Garage`
+   - `Recycler`
+   - `User`
+2. Implement `process_components()` for all agents
+3. Implement `update_demand()` for all agents
 
 ---
 ## 3. Repository Structure
@@ -104,7 +114,7 @@ Figure 1 shows the various agents in this network and how several kinds of compo
 
 ### 4.3 Components
 
-The enumeration `Component` defines that there are different kinds of plastics, but also parts and cars. This comes in handy when dealing with polymorphic methods that handle stock and demand. The table below shows the different values in the first column. For the plastics, it is the case that both data types for stock and demand are floats. We refer here to mass in e.g., kilogram or tonnes. The data types for `PARTS` and `CARS` differs. A `Part` is a custom-made object that consists of a ratio of plastics and a state `PartState` which is either `STANDARD` or `REUSED`. A `Car` consist mainly of a number of `Part`s. So, the stocks for these two components are lists because they contain these objects. Their demand data types are integers, however. And this has to be adjusted further! 
+The enumeration `Component` defines that there are different kinds of plastics, but also parts and cars. This comes in handy when dealing with polymorphic methods that handle stock and demand. The table below shows the different values in the first column. For the plastics, it is the case that both data types for stock and demand are floats. We refer here to mass in e.g., kilogram or tonnes. The data types for `PARTS` and `CARS` differs. A `Part` is a custom-made object that consists of a ratio of plastics and a state `PartState` which is either `STANDARD` or `REUSED`. A `Car` consist mainly of a number of `Part`s. So, the stocks for these two components are lists because they contain these objects. Their demand data types are integers, however. **And this has to be adjusted further!** 
 
 | Component        | Stock Data Type | Demand Data Type |
 |------------------|-----------------|------------------|
@@ -126,13 +136,12 @@ Figure 2 shows what an instance of the `Car` class can look like. Additionally, 
 ## 5. XLRM
 
 The XLRM framework describes the analysis of a model by distinguishing:
-
 - X: Uncertainty variables which define the Scenarios
 - L: Lever varaibles which define the policies or solutions
 - R: Relations which describe the inner working of the model
 - M: Metrics which define the key performance indicators (KPIs)
 
-The following sub-sections describe these in more detail.
+The following sub-sections describe X, L, and M in more detail.
 
 ### 5.1 KPIs
 ### 5.2 Policies
