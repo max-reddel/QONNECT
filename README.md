@@ -116,6 +116,8 @@ Figure 1 shows the various agents in this network and how several kinds of compo
 
 The enumeration `Component` defines that there are different kinds of plastics, but also parts and cars. This comes in handy when dealing with polymorphic methods that handle stock and demand. The table below shows the different values in the first column. For the plastics, it is the case that both data types for stock and demand are floats. We refer here to mass in e.g., kilogram or tonnes. The data types for `PARTS` and `CARS` differs. A `Part` is a custom-made object that consists of a ratio of plastics and a state `PartState` which is either `STANDARD` or `REUSED`. A `Car` consist mainly of a number of `Part`s. So, the stocks for these two components are lists because they contain these objects. Their demand data types are integers, however. **And this has to be adjusted further!** 
 
+Currenlty, everything works. But for `PARTS` and `CARS`, it's a simple way of just stating how many parts and how many cars an agent wants/demands. We need to discuss how we want to proceed here.
+
 | Component        | Stock Data Type | Demand Data Type |
 |------------------|-----------------|------------------|
 | `VIRGIN`         | float           | float            |
