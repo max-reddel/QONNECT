@@ -389,9 +389,12 @@ class Garage(GenericAgent):
          :param unique_id: int
          :param model: CEPAIModel
          :param all_agents: dictionary with {Agent: list of Agents}
-         """
+        """
         super().__init__(unique_id, model, all_agents)
 
+    def get_all_components(self):
+        #check whether anything happens
+        pass
 
 class Dismantler(GenericAgent):
     """
