@@ -58,11 +58,18 @@ Agents have also received some adjustment treatment. `CarDesigner`s and `Logisti
 
 1. Add more details to the following agents:
    - `Dismantler`
+      - `process_components` method is implemented. It Dismantles the car, reuses the STANDARD parts and adds them to the stock. However, I am not sure what do with the dismantled cars. Since, there is no plastic left, there is no point in sending it to shredders (in the model implementation). However, we can send the the reused parts extracted from the car to recyclers. I am not sure about how to implement this but we can discuss it during our next meeting.
+
    - `Garage`
    - `Recycler`
+      - __init__ is redified to inlcude `demand` and `default_demand`. Recyclers have demand for both CARS and PARTS. Recycler revieve CARS from Garages and PARTS (reused) from Dismantler. 
+      - `process_components` method is implemented. This function extracts the plastic from both CARS and PART. VIRGIN plastic present in the parts is recycled as RECYCLATE_HIGH. RECYCLATE_HIGH present in the parts is extracted and is converted into RECYCLATE_LOW. RECYCLATE_LOW in components is discareded.
    - `User`
 2. Implement `process_components()` for all agents
 3. Implement `update_demand()` for all agents
+
+PS: These implementations are not tested completly because Garage is not implememted in this branch yet. Also, I need someone to evaluate the code as I am not ver familiar with this style of code and using enum. Lastly, I tried and am willing to learn.
+
 
 ---
 ## 3. Repository Structure
