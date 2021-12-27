@@ -16,10 +16,18 @@ class Car:
     def __init__(self, brand):
 
         self.life_time_current = 0
+        self.ELV = 10 # So basically we could multiply this with a use intensity of the user to update it.
         self.state = CarState.FUNCTIONING
         self.brand = brand
         self.parts = []
 
+    def repair_car(self, part):
+        self.state = CarState.FUNCTIONING
+        self.parts = self.parts[1:]
+        self.parts.append(part)
+
+    def increment_lifetime(self):
+        self.life_time_current += 1
 
 class Part:
     """

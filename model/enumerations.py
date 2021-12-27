@@ -26,6 +26,7 @@ class CarState(Enum):
     """
     BROKEN = 0
     FUNCTIONING = 1
+    TOTAL_LOSS = 2
 
 
 class Brand(Enum):
