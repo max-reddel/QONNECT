@@ -6,7 +6,6 @@ from mesa import Agent
 from model.preferences import *
 from model.bigger_components import *
 import math
-import random
 
 
 class GenericAgent(Agent):
@@ -313,12 +312,11 @@ class Recycler(GenericAgent):
         self.demand[Component.CARS] = round(self.random.normalvariate(mu=100.0, sigma=2))
         self.default_demand[Component.CARS] = self.demand[Component.CARS]
 
-        
-
     def step(self):
         """
         Step method.
         """
+
     def process_components(self):
         # return super().process_components()
 
@@ -327,7 +325,7 @@ class Recycler(GenericAgent):
         # RECYCLATE_HIGH present in part is extracted and is converted into RECYCLATE_LOW.
         # The RECYCLATE_LOW in components is discareded. 
         for part in self.stock[Component.PARTS]:
-            plastic_ratio = Part.extract_plastic(part)
+            plastic_ratio = part.extract_plastic()
             self.stock[Component.RECYCLATE_LOW] += plastic_ratio[Component.RECYCLATE_HIGH]
             self.stock[Component.RECYCLATE_HIGH] += plastic_ratio[Component.VIRGIN]
         self.stock[Component.PARTS] = []
@@ -336,7 +334,7 @@ class Recycler(GenericAgent):
         for car in self.stock[Component.CARS]:
             # Extracting parts to get the plastic 
             for part in car.parts:
-                plastic_ratio = Part.extract_plastic(part)
+                plastic_ratio = part.extract_plastic()
                 self.stock[Component.RECYCLATE_LOW] += plastic_ratio[Component.RECYCLATE_HIGH]
                 self.stock[Component.RECYCLATE_HIGH] += plastic_ratio[Component.VIRGIN]
         self.stock[Component.CARS] = []
@@ -454,11 +452,12 @@ class Dismantler(GenericAgent):
         super().__init__(unique_id, model, all_agents)
 
         self.stock[Component.PARTS] = [Part() for _ in range(100)]
-        
+
         # Randomly select a brand for each car in the stock
-        brands=[]
-        for brand in (Brand): brands.append(str(brand).rpartition('.')[2])
-        self.stock[Component.CARS] = [Car(brand = self.random.choice(brands)) for _ in range(10)]
+        brands = []
+        for brand in Brand:
+            brands.append(str(brand).rpartition('.')[2])
+        self.stock[Component.CARS] = [Car(brand=self.random.choice(brands)) for _ in range(10)]
 
         self.prices[Component.PARTS] = self.random.normalvariate(mu=2.5, sigma=0.2)  # cost per unit
 
@@ -469,22 +468,21 @@ class Dismantler(GenericAgent):
         """
         Dismantle the car and adds the extracted parts to stock
         """
-        # super().process_components(self)
 
         # Sanity check
         if len(self.stock[Component.CARS]) < 1:
-            raise('ValueError')
+            raise 'ValueError'
         # Dismantles the car, reuses the STANDARD parts and adds them to the stock
         for car in self.stock[Component.CARS]:
             for part in car.parts:
-                if car.parts['state'] == 'STANDARD':
+                if part.state.__eq__(PartState.STANDARD):
+                    print('going into the enumeration')
                     part = Part.reuse(part)
                     self.stock[Component.PARTS].append(part)
                 else:
                     # TODO: What to do with the reused parts?
                     pass
         self.stock[Component.CARS] = []
-        
 
     def get_all_components(self):
         """
@@ -495,5 +493,3 @@ class Dismantler(GenericAgent):
         self.get_component_from_suppliers(suppliers=garages, component=Component.CARS)
 
     # TODO: Send dismantelled cars to Recyclers
-
-
