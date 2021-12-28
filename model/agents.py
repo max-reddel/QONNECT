@@ -366,6 +366,7 @@ class User(GenericAgent):
         super().__init__(unique_id, model, all_agents)
 
         self.garages = self.all_agents[Garage]
+        self.car_repair = False
 
         self.stock[Component.CARS] = []
         self.demand[Component.CARS] = 1
@@ -373,32 +374,33 @@ class User(GenericAgent):
 
     def get_all_components(self):
         """
-        Determine the order of suppliers by personal preference and then buy components. ONLY CALL WHEN POSSESSES NO CAR
+        Determine the order of suppliers by personal preference and then buy components.
+        For a user this function buys a car of a car manufacturer when it has no car in possession and its car is not
+        being repaired at a garage.
         """
-        if len(self.stock[Component.CARS]) == 0:
+        if (len(self.stock[Component.CARS]) == 0) and (car_repair = False):
             car_manufacturers = self.all_agents[CarManufacturer]
             car_manufacturers = self.get_sorted_suppliers(suppliers=car_manufacturers, component=Component.CARS)
             self.get_component_from_suppliers(suppliers=car_manufacturers, component=Component.CARS)
 
-    def to_sell_car(self): # Do we need this? User knows when to sell its car. Or we make a global list
-        """
-        Do we need this? User knows when to sell its car.
-        Other way and to not slow down the code a lot is making a global list with users who want to sell their cars.
-        Then use get_component_from_suppliers function in such a way that garages get all cars from these users.
-        Then we need to use this function or to_increment_lifetime to append this list.
-        NO USE PROVIDE FUNCTION, BECAUSE IT CAN CHOOSE WHICH GARAGE TO GO TO.
-        """
-        pass
-
-    def bring_car_to_garage(self):
+    def bring_car_to_garage(self, car):
         """
         Bring car to garage of choice in case it is broken or total loss. Currently, garage is randomly chosen.
         """
-        car = self.stock[Component.CARS][0]
-
-        if car.state == (CarState.FUNCTIONING OR CarState.TOTAL_LOSS): #### Max, please have a look at this.
+        if car.state.__eq__(CarState.BROKEN):
             garage_of_choice = self.random.choice(self.garages)
             garage_of_choice.receive_car_from_user(user=self, car=car)
+            self.car_repair = True
+        elif car.state.__eq__(CarState.TOTAL_LOSS):
+            garage_of_choice = self.random.choice(self.garages)
+            garage_of_choice.receive_car_from_user(user=self, car=car)
+
+    def possess_car(self):
+        if len(self.stock[Component.CARS]) == 1:
+            car = self.stock[Component.CARS][0]
+            self.bring_car_to_garage(car)
+            car.use_car()
+
 
 class Garage(GenericAgent):
     """
@@ -418,6 +420,7 @@ class Garage(GenericAgent):
 
         self.stock[Component.CARS] = []
         self.stock[Component.PARTS] = []
+        # Extra Enum for stock of parts to be discarded? May also be nice for dismantlers!
 
         self.demand[Component.PARTS] = round(self.random.normalvariate(mu=100.0, sigma=2))
         self.default_demand[Component.PARTS] = self.demand[Component.PARTS]
@@ -437,10 +440,11 @@ class Garage(GenericAgent):
         """
         component = Component.CARS
         self.demand[component] = 1  # To make functions work for receiving cars.
-        #car = user.get_stock()[component]
 
-        self.customer_base[car] = user
         self.get_component_from_suppliers(suppliers=user, component=component)
+
+        if car.state.__eq__(Carstate.BROKEN):
+            self.customer_base[car] = user
 
 
     def repair_and_return_cars(self):
@@ -448,24 +452,31 @@ class Garage(GenericAgent):
         In the Car class is defined which component is broken and needs to be replaced, currently limited to one part.
         This function simply replaces that part.
         """
-        cars_to_be_repaired = self.stock[Component.CARS] # Also check states of cars! Broken, end of life...
+        cars_to_be_repaired = self.stock[Component.CARS]
         while self.stock[Component.PARTS]:
-            part = self.stock[Component.PARTS][0]
-            self.stock[Component.PARTS] = self.stock[Component.PARTS][1:]
 
             car = cars_to_be_repaired[0]
             cars_to_be_repaired = cars_to_be_repaired[1:]
 
-            car.repair_car(part)
+            if car.state.__eq__(Carstate.BROKEN):
+                part = self.stock[Component.PARTS][0]
+                self.stock[Component.PARTS] = self.stock[Component.PARTS][1:]
 
-            self.provide(recepient=customer_base[car], component=Component.CARS, amount=1)
+                car.repair_car(part)
+
+                self.provide(recepient=customer_base[car], component=Component.CARS, amount=1)
 
     def supply_cars(self):
         """
         Not sure yet whether is needed. Provide cars to dismantlers and shredders.
         We can also make a list with cars to be recycled and simply call get_all_components for example.
         """
-        pass
+        # cars_to_discard = self.stock[Component.CARS]
+        # for car in cars_to_discard:
+        #     if car.state.__eq__(CarState.TOTAL_LOSS):
+        #         # Supply to either dismantler or shredder
+        # pass
+
 
 class Dismantler(GenericAgent):
     """
