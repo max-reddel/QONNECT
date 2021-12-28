@@ -390,20 +390,13 @@ class User(GenericAgent):
         """
         pass
 
-    def to_increment_lifetime(self):
-        if len(self.stock[Component.CARS]) == 1: # Only increment when user possesses a car.
-            car = self.stock[Component.CARS][0]
-            car.increment_lifetime()
-            if car.ELV == car.life_time_current:
-                car.state = CarState.TOTAL_LOSS
-
     def bring_car_to_garage(self):
         """
         Bring car to garage of choice in case it is broken or total loss. Currently, garage is randomly chosen.
         """
         car = self.stock[Component.CARS][0]
 
-        if car.state == (CarState.FUNCTIONING OR CarState.TOTAL_LOSS):
+        if car.state == (CarState.FUNCTIONING OR CarState.TOTAL_LOSS): #### Max, please have a look at this.
             garage_of_choice = self.random.choice(self.garages)
             garage_of_choice.receive_car_from_user(user=self, car=car)
 
