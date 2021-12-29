@@ -267,7 +267,7 @@ class PartsManufacturer(GenericAgent):
         }
 
         # Adjust virgin plastic weight such that the sum of all plastic will be 1.0
-        plastic_ratio[Component.VIRGIN] = 1.0 - sum(plastic_ratio.values())
+        plastic_ratio[Component.VIRGIN] = max(0, 1.0 - sum(plastic_ratio.values()))
 
         return plastic_ratio
 
