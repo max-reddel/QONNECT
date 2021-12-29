@@ -203,6 +203,7 @@ class GenericAgent(Agent):
         """
         Update own demand for next round. E.g., see how much this agent had to supply versus how much stock there was.
         # TODO: Currently, the demand for the next round equals the default demand. Improve!
+        # TODO: This function could maybe also used to adjust prices, etc. for the next round.
         """
         self.demand = self.default_demand.copy()
 
@@ -269,23 +270,24 @@ class PartsManufacturer(GenericAgent):
 
 
 class Refiner(GenericAgent):
+    """
+    Refiner agent that produces virgin plastic.
+    """
 
     def __init__(self, unique_id, model, all_agents):
+        """
+        :param unique_id: int
+        :param model: CEPAIModel
+        :param all_agents: dictionary with {Agent: list of Agents}
+        """
         super().__init__(unique_id, model, all_agents)
-
         self.stock[Component.VIRGIN] = math.inf
         self.prices[Component.VIRGIN] = self.random.normalvariate(mu=2.5, sigma=0.2)  # cost per unit
-
-    def step(self):
-        """
-        Step method.
-        """
-        pass
 
 
 class Recycler(GenericAgent):
     """
-    Recycler and Postshredder agent.
+    Recycler agent that processes old parts and cars into recyclate plastic.
     """
 
     def __init__(self, unique_id, model, all_agents):
@@ -303,11 +305,6 @@ class Recycler(GenericAgent):
         self.prices[Component.RECYCLATE_HIGH] = self.random.normalvariate(mu=2.5, sigma=0.2)  # cost per unit
 
         # TODO: Need to define demand and default_demand (but for this, we need to define this agent's suppliers first)
-
-    def step(self):
-        """
-        Step method.
-        """
 
 
 class CarManufacturer(GenericAgent):
@@ -353,7 +350,7 @@ class CarManufacturer(GenericAgent):
 
 class User(GenericAgent):
     """
-    This agent was used to validate the car buying behavior. Currently, a user buys a car at each instant.
+    Car user agent. Can buy a car, use it, and can bring it to a garage for repairs or for discarding it.
     # TODO: Changes are needed.
     """
 
