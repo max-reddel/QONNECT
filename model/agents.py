@@ -6,7 +6,6 @@ from mesa import Agent
 from model.preferences import *
 from model.bigger_components import *
 import math
-import random
 
 
 class GenericAgent(Agent):
@@ -66,7 +65,6 @@ class GenericAgent(Agent):
             Component.RECYCLATE_LOW: 0.0,
             Component.RECYCLATE_HIGH: 0.0
         }
-
 
     def get_all_components(self):
         """
@@ -238,8 +236,6 @@ class PartsManufacturer(GenericAgent):
             Component.RECYCLATE_HIGH: self.random.normalvariate(mu=3.0, sigma=0.1),
             Component.PARTS: [Part() for _ in range(100)]}
 
-        self.MAX_PART_WEIGHT = 10.0
-
         self.minimum_requirements = {
             Component.RECYCLATE_LOW: 0.2,
             Component.RECYCLATE_HIGH: 0.2}
@@ -253,7 +249,8 @@ class PartsManufacturer(GenericAgent):
 
         for _ in range(self.demand[Component.PARTS]):
             plastic_ratio = self.compute_plastic_ratio()
-            self.stock[Component.PARTS].append(Part(plastic_ratio))
+            new_part = Part(plastic_ratio)
+            self.stock[Component.PARTS].append(new_part)
 
     def compute_plastic_ratio(self):
         """
@@ -263,9 +260,9 @@ class PartsManufacturer(GenericAgent):
 
         plastic_ratio = {
             Component.VIRGIN: 0,
-            Component.RECYCLATE_LOW: random.uniform(self.minimum_requirements[Component.RECYCLATE_LOW],
+            Component.RECYCLATE_LOW: self.random.uniform(self.minimum_requirements[Component.RECYCLATE_LOW],
                                                     self.minimum_requirements[Component.RECYCLATE_LOW] * 1.25),
-            Component.RECYCLATE_HIGH: random.uniform(self.minimum_requirements[Component.RECYCLATE_HIGH],
+            Component.RECYCLATE_HIGH: self.random.uniform(self.minimum_requirements[Component.RECYCLATE_HIGH],
                                                      self.minimum_requirements[Component.RECYCLATE_HIGH] * 1.25)
         }
 
@@ -332,7 +329,7 @@ class Recycler(GenericAgent):
 
 class CarManufacturer(GenericAgent):
     """
-    CarManufcaturer agent.
+    CarManufcaturer agent which transforms parts into cars.
     """
 
     def __init__(self, unique_id, model, all_agents, brand):
@@ -346,12 +343,13 @@ class CarManufacturer(GenericAgent):
         self.brand = brand
 
         self.stock[Component.PARTS] = [Part() for _ in range(100)]
-        self.stock[Component.CARS] = [Car(Brand.MERCEDES) for _ in range(10)]
+        self.stock[Component.CARS] = [Car(self.brand) for _ in range(10)]
 
         self.prices[Component.PARTS] = self.random.normalvariate(mu=2.5, sigma=0.2)  # cost per unit
         self.prices[Component.CARS] = self.random.normalvariate(mu=1000.0, sigma=0.2)  # cost per unit
 
         self.demand[Component.PARTS] = round(self.random.normalvariate(mu=100.0, sigma=2))
+        self.demand[Component.CARS] = round(self.random.normalvariate(mu=10.0, sigma=2))  # aim to produce
         self.default_demand[Component.PARTS] = self.demand[Component.PARTS]
 
     def get_all_components(self):
@@ -367,8 +365,29 @@ class CarManufacturer(GenericAgent):
         """
         Manufacture specific amount of cars.
         """
-        # TODO: Implement this while using some kind of combination of parts and considering minimum requirements.
-        pass
+        for _ in range(self.demand[Component.CARS]):
+            parts = self.get_next_parts(nr_of_parts=4)
+            if not parts:
+                break
+            else:
+                new_car = Car(brand=self.brand, parts=parts)
+                self.stock[Component.CARS].append(new_car)
+
+    def get_next_parts(self, nr_of_parts=4):
+        """
+        Get the next four parts from stock and return them to create a car with them.
+        :param nr_of_parts: int: indicates how many parts a car needs to be fully assembled
+        :return:
+            next_parts: list with Parts
+        """
+        all_parts = self.stock[Component.PARTS]
+
+        if len(all_parts) >= nr_of_parts:
+            next_parts = all_parts[:4]
+        else:
+            next_parts = []
+
+        return next_parts
 
 
 class User(GenericAgent):

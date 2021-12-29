@@ -15,12 +15,22 @@ class Part:
 
     def __init__(self, plastic_ratio=None, state=PartState.STANDARD):
 
+        self.minimum_requirements = {
+            Component.RECYCLATE_LOW: 0.2,
+            Component.RECYCLATE_HIGH: 0.2}
+
         if plastic_ratio is None:
             self.plastic_ratio = {
-                Component.VIRGIN: 0.0,
-                Component.RECYCLATE_LOW: 0.0,
-                Component.RECYCLATE_HIGH: 0.0
+                Component.VIRGIN: 0,
+                Component.RECYCLATE_LOW: random.uniform(
+                    self.minimum_requirements[Component.RECYCLATE_LOW],
+                    self.minimum_requirements[Component.RECYCLATE_LOW] * 1.25),
+                Component.RECYCLATE_HIGH: random.uniform(
+                    self.minimum_requirements[Component.RECYCLATE_HIGH],
+                    self.minimum_requirements[Component.RECYCLATE_HIGH] * 1.25)
             }
+            # Adjust virgin plastic weight such that the sum of all plastic will be 1.0
+            self.plastic_ratio[Component.VIRGIN] = 1.0 - sum(self.plastic_ratio.values())
         else:
             self.plastic_ratio = plastic_ratio
 
