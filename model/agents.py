@@ -6,6 +6,7 @@ from mesa import Agent
 from model.preferences import *
 from model.bigger_components import *
 import math
+import random
 
 
 class GenericAgent(Agent):
@@ -48,13 +49,7 @@ class GenericAgent(Agent):
         }
 
         # Default Demand of specific components
-        self.default_demand = {
-            Component.VIRGIN: 0.0,
-            Component.RECYCLATE_LOW: 0.0,
-            Component.RECYCLATE_HIGH: 0.0,
-            Component.PARTS: 0,
-            Component.CARS: 0
-        }
+        self.default_demand = self.demand.copy()
 
         # Prices for specific components
         self.prices = {
@@ -65,21 +60,13 @@ class GenericAgent(Agent):
             Component.CARS: math.inf
         }
 
-        # Stock goals of specific components (how much does an agent want to have in their own stock at each instant)
-        self.stock_goals = {
-            Component.VIRGIN: 0.0,
-            Component.RECYCLATE_LOW: 0.0,
-            Component.RECYCLATE_HIGH: 0.0,
-            Component.PARTS: 0,
-            Component.CARS: 0
-        }
-
-        # Minimum requirements given by law or car designers
+        # Minimum requirements given by law or car designer
         self.minimum_requirements = {
             PartState.REUSED: 0.0,
             Component.RECYCLATE_LOW: 0.0,
             Component.RECYCLATE_HIGH: 0.0
         }
+
 
     def get_all_components(self):
         """
@@ -196,7 +183,6 @@ class GenericAgent(Agent):
         """
         Process goods (manufactuging, shredding, using, or repairing).
         """
-        # TODO: Implement this while using some kind of combination of plastics under specific constraints.
         pass
 
     def update_demand(self):
@@ -241,7 +227,8 @@ class PartsManufacturer(GenericAgent):
         self.demand = {
             Component.VIRGIN: self.random.normalvariate(mu=2.0, sigma=0.2),
             Component.RECYCLATE_LOW: self.random.normalvariate(mu=2.0, sigma=0.2),
-            Component.RECYCLATE_HIGH: self.random.normalvariate(mu=3.0, sigma=0.1)}
+            Component.RECYCLATE_HIGH: self.random.normalvariate(mu=3.0, sigma=0.1),
+            Component.PARTS: round(self.random.normalvariate(mu=50.0, sigma=10.0))}  # How many parts to manufacture
 
         self.default_demand = self.demand.copy()
 
@@ -250,6 +237,42 @@ class PartsManufacturer(GenericAgent):
             Component.RECYCLATE_LOW: self.random.normalvariate(mu=2.0, sigma=0.2),
             Component.RECYCLATE_HIGH: self.random.normalvariate(mu=3.0, sigma=0.1),
             Component.PARTS: [Part() for _ in range(100)]}
+
+        self.MAX_PART_WEIGHT = 10.0
+
+        self.minimum_requirements = {
+            Component.RECYCLATE_LOW: 0.2,
+            Component.RECYCLATE_HIGH: 0.2}
+
+    def process_components(self):
+        """
+        Manufacture parts out of plastic.
+
+        Remark: Currrently, this is very simply implemented as it doesn't specify what plastic_ratio the parts have.
+        """
+
+        for _ in range(self.demand[Component.PARTS]):
+            plastic_ratio = self.compute_plastic_ratio()
+            self.stock[Component.PARTS].append(Part(plastic_ratio))
+
+    def compute_plastic_ratio(self):
+        """
+        Compute the ratio of plastic that is needed to create parts
+        :return:
+        """
+
+        plastic_ratio = {
+            Component.VIRGIN: 0,
+            Component.RECYCLATE_LOW: random.uniform(self.minimum_requirements[Component.RECYCLATE_LOW],
+                                                    self.minimum_requirements[Component.RECYCLATE_LOW] * 1.25),
+            Component.RECYCLATE_HIGH: random.uniform(self.minimum_requirements[Component.RECYCLATE_HIGH],
+                                                     self.minimum_requirements[Component.RECYCLATE_HIGH] * 1.25)
+        }
+
+        # Adjust virgin plastic weight such that the sum of all plastic will be 1.0
+        plastic_ratio[Component.VIRGIN] = 1.0 - sum(plastic_ratio.values())
+
+        return plastic_ratio
 
     def get_all_components(self):
         """
