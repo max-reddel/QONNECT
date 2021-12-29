@@ -26,7 +26,9 @@ class CEPAIModel(Model):
                 Refiner: 3,
                 Recycler: 2,
                 CarManufacturer: len(self.brands),
-                User: 1
+                User: 1,
+                Garage: 2,
+                Dismantler: 1
             }
         else:
             self.agent_counts = agent_counts

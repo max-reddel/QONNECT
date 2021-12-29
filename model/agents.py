@@ -364,8 +364,6 @@ class User(GenericAgent):
          :param all_agents: dictionary with {Agent: list of Agents}
          """
         super().__init__(unique_id, model, all_agents)
-
-        self.garages = self.all_agents[Garage]
         self.car_repair = False
 
         self.stock[Component.CARS] = []
@@ -378,7 +376,8 @@ class User(GenericAgent):
         For a user this function buys a car of a car manufacturer when it has no car in possession and its car is not
         being repaired at a garage.
         """
-        if (len(self.stock[Component.CARS]) == 0) and (car_repair = False):
+        self.garages = self.all_agents[Garage]
+        if len(self.stock[Component.CARS]) == 0 and not self.car_repair:
             car_manufacturers = self.all_agents[CarManufacturer]
             car_manufacturers = self.get_sorted_suppliers(suppliers=car_manufacturers, component=Component.CARS)
             self.get_component_from_suppliers(suppliers=car_manufacturers, component=Component.CARS)
@@ -405,7 +404,6 @@ class User(GenericAgent):
 class Garage(GenericAgent):
     """
     This agent was used to validate the car buying behavior.
-    # TODO: Further implementation is needed
     """
 
     def __init__(self, unique_id, model, all_agents):
@@ -443,9 +441,8 @@ class Garage(GenericAgent):
 
         self.get_component_from_suppliers(suppliers=user, component=component)
 
-        if car.state.__eq__(Carstate.BROKEN):
+        if car.state.__eq__(CarState.BROKEN):
             self.customer_base[car] = user
-
 
     def repair_and_return_cars(self):
         """
@@ -458,13 +455,13 @@ class Garage(GenericAgent):
             car = cars_to_be_repaired[0]
             cars_to_be_repaired = cars_to_be_repaired[1:]
 
-            if car.state.__eq__(Carstate.BROKEN):
+            if car.state.__eq__(CarState.BROKEN):
                 part = self.stock[Component.PARTS][0]
                 self.stock[Component.PARTS] = self.stock[Component.PARTS][1:]
 
                 car.repair_car(part)
 
-                self.provide(recepient=customer_base[car], component=Component.CARS, amount=1)
+                self.provide(recepient=self.customer_base[car], component=Component.CARS, amount=1)
 
     def supply_cars(self):
         """
