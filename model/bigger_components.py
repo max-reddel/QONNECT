@@ -61,12 +61,12 @@ class Car:
     """
 
     def __init__(self, brand, parts=None, break_down_probability=0.1):
-
+        # Apply parameters, if none specified then it will be a new car. Otherwise, randomly old car.
         if parts is None:
             parts = [Part(), Part(), Part(), Part()]
 
         self.life_time_current = 0
-        self.ELV = 10  # So basically we could multiply this with a use intensity of the user to update it.
+        self.ELV = 10
         self.state = CarState.FUNCTIONING
         self.brand = brand
         self.parts = parts
@@ -97,7 +97,7 @@ class Car:
 
     def to_break_down(self):
         if self.life_time_current == self.ELV:
-            self.state = CarState.TOTAL_LOSS
+            self.state = CarState.END_OF_LIFE
 
         elif random.random() < self.break_down_probability:
             self.state = CarState.BROKEN

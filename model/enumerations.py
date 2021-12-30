@@ -9,7 +9,10 @@ class Component(Enum):
     RECYCLATE_LOW = 2
     RECYCLATE_HIGH = 3
     PARTS = 4
-    CARS = 5
+    DISCARDED_PARTS = 5
+    CARS = 6
+    CARS_FOR_SHREDDER = 7
+    CARS_FOR_DISMANTLER = 8
 
 
 class PartState(Enum):
@@ -26,7 +29,7 @@ class CarState(Enum):
     """
     BROKEN = 0
     FUNCTIONING = 1
-    TOTAL_LOSS = 2
+    END_OF_LIFE = 2
 
 
 class Brand(Enum):
