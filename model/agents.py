@@ -66,6 +66,9 @@ class GenericAgent(Agent):
             Component.RECYCLATE_HIGH: 0.0
         }
 
+        # Track how much was sold last tick and the the tick before that
+        self.sold_volume = {'last': 0, 'second_last': 0}
+
     def get_all_components(self):
         """
         Determine the order of suppliers by personal preference and then buy components.
@@ -102,10 +105,12 @@ class GenericAgent(Agent):
             if self.sufficient_stock(rest_demand, stock_of_supplier):
                 supplier.provide(recepient=self, component=component, amount=rest_demand)
                 self.reduce_current_demand(supplies=rest_demand, component=component)
+                supplier.register_sales(rest_demand)
             else:
                 rest_stock = self.get_rest_stock(stock_of_supplier)
                 supplier.provide(recepient=self, component=component, amount=rest_stock)
                 self.reduce_current_demand(supplies=rest_stock, component=component)
+                supplier.register_sales(rest_stock)
 
             # Adjust remaining demand and supplier list
             rest_demand = self.demand[component]
@@ -208,6 +213,21 @@ class GenericAgent(Agent):
             truth = rest_demand <= len(stock_of_supplier)
         return truth
 
+    def register_sales(self, sales):
+        """
+        Register the sales of an agent during the current instant. This can then be used later to adjust prices and e.g.
+        production of components.
+        """
+        if isinstance(sales, float) or isinstance(sales, int):
+            amount = sales
+        elif isinstance(sales, list):
+            amount = len(sales)
+        else:
+            amount = 0
+
+        self.sold_volume['second_last'] = self.sold_volume['last']
+        self.sold_volume['last'] = amount
+
 
 class PartsManufacturer(GenericAgent):
     """
@@ -303,6 +323,19 @@ class Refiner(GenericAgent):
         super().__init__(unique_id, model, all_agents)
         self.stock[Component.VIRGIN] = math.inf
         self.prices[Component.VIRGIN] = self.random.normalvariate(mu=2.5, sigma=0.2)  # cost per unit
+
+    def update(self):
+        """
+        Update prices for the next instant depending on the sales developed within the last two instants.
+        """
+        prev_year = self.sold_volume['last']
+        prev_prev_year = self.sold_volume['second_last']
+        noise = self.random.normalvariate(mu=1.0, sigma=0.2)
+
+        if prev_year != 0 and prev_prev_year != 0:
+            self.prices[Component.VIRGIN] = self.prices[Component.VIRGIN] * prev_prev_year / prev_year * noise
+        else:
+            self.prices[Component.VIRGIN] = self.random.normalvariate(mu=2.5, sigma=0.2)
 
 
 class Recycler(GenericAgent):
