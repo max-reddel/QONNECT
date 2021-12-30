@@ -162,7 +162,7 @@ class GenericAgent(Agent):
         if isinstance(self.stock[component], float) or isinstance(self.stock[component], int):
             self.stock[component] += amount
         elif isinstance(self.stock[component], list):
-            self.stock[component].append(supplies)
+            self.stock[component] += supplies
 
     def get_stock(self):
         """
@@ -429,7 +429,7 @@ class User(GenericAgent):
             car_manufacturers = self.all_agents[CarManufacturer]
             car_manufacturers = self.get_sorted_suppliers(suppliers=car_manufacturers, component=Component.CARS)
             self.get_component_from_suppliers(suppliers=car_manufacturers, component=Component.CARS)
-            car = self.stock[Component.CARS][:1]
+            car = self.stock[Component.CARS][0]
             car.ELV = car.ELV * self.use_intensity
 
     def bring_car_to_garage(self, car):
@@ -460,6 +460,7 @@ class User(GenericAgent):
 
     def process_components(self):
         self.possess_car()
+
 
 class Garage(GenericAgent):
     """
@@ -542,6 +543,7 @@ class Garage(GenericAgent):
 
     def process_components(self):
         self.repair_and_return_cars()
+
 
 class Dismantler(GenericAgent):
     """

@@ -26,7 +26,7 @@ class CEPAIModel(Model):
                 Refiner: 3,
                 Recycler: 2,
                 CarManufacturer: len(self.brands),
-                User: 1,
+                User: 2,
                 Garage: 2,
                 Dismantler: 1
             }
@@ -74,7 +74,6 @@ class CEPAIModel(Model):
             car = Car(brand=brand, lifetime_current=lifetime_current, state=state, parts=parts)
         return car
 
-
     def create_all_agents(self):
         """
         Create all agents for this model.
@@ -99,6 +98,7 @@ class CEPAIModel(Model):
                     complicated setup procedure.
                     """
                     new_agent = agent_type(self.next_id(), self, all_agents)
+
                 self.schedule.add(new_agent)
                 if agent_type in all_agents:
                     all_agents[agent_type].append(new_agent)
