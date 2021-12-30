@@ -399,7 +399,7 @@ class User(GenericAgent):
     # TODO: Changes are needed.
     """
 
-    def __init__(self, unique_id, model, all_agents, use_intensity=1):
+    def __init__(self, unique_id, model, all_agents, car=None, use_intensity=1):
         """
          :param unique_id: int
          :param model: CEPAIModel
@@ -410,8 +410,10 @@ class User(GenericAgent):
         self.car_repair = False
 
         self.garages = []
-
-        self.stock[Component.CARS] = []
+        if car is None:
+            self.stock[Component.CARS] = []
+        else:
+            self.stock[Component.CARS] = [car]
         self.demand[Component.CARS] = 1
         self.default_demand[Component.CARS] = self.demand[Component.CARS]
 
@@ -422,12 +424,12 @@ class User(GenericAgent):
         being repaired at a garage.
         When the user has bought the car, the ELV of the car is corrected by the intensity of use of the car.
         """
-        self.garages = self.all_agents[Garage]
+
         if not self.stock[Component.CARS] and not self.car_repair:
             car_manufacturers = self.all_agents[CarManufacturer]
             car_manufacturers = self.get_sorted_suppliers(suppliers=car_manufacturers, component=Component.CARS)
             self.get_component_from_suppliers(suppliers=car_manufacturers, component=Component.CARS)
-            car = self.stock[Component.CARS][0]
+            car = self.stock[Component.CARS][:1]
             car.ELV = car.ELV * self.use_intensity
 
     def bring_car_to_garage(self, car):
@@ -436,11 +438,13 @@ class User(GenericAgent):
         # TODO: choose garage based on price of parts
         """
         if car.state.__eq__(CarState.BROKEN):
-            garage_of_choice = self.random.choice(self.garages)
+            garages = self.all_agents[Garage]
+            garage_of_choice = self.random.choice(garages)
             garage_of_choice.receive_car_from_user(user=self, car=car)
             self.car_repair = True
         elif car.state.__eq__(CarState.END_OF_LIFE):
-            garage_of_choice = self.random.choice(self.garages)
+            garages = self.all_agents[Garage]
+            garage_of_choice = self.random.choice(garages)
             garage_of_choice.receive_car_from_user(user=self, car=car)
 
     def possess_car(self):
@@ -454,6 +458,8 @@ class User(GenericAgent):
             self.bring_car_to_garage(car)
             car.use_car()
 
+    def process_components(self):
+        self.possess_car()
 
 class Garage(GenericAgent):
     """
@@ -534,7 +540,8 @@ class Garage(GenericAgent):
                 self.provide(recepient=self.customer_base[car], component=Component.CARS, amount=1)
                 self.customer_base[car].car_repair = False
 
-
+    def process_components(self):
+        self.repair_and_return_cars()
 
 class Dismantler(GenericAgent):
     """

@@ -60,14 +60,15 @@ class Car:
     The Car class.
     """
 
-    def __init__(self, brand, parts=None, break_down_probability=0.1):
+    def __init__(self, brand, lifetime_current=0, state=CarState.FUNCTIONING,
+                 parts=None, nr_of_parts=4, break_down_probability=0.1):
         # Apply parameters, if none specified then it will be a new car. Otherwise, randomly old car.
         if parts is None:
-            parts = [Part(), Part(), Part(), Part()]
+            parts = [Part() for _ in range(nr_of_parts)]
 
-        self.life_time_current = 0
+        self.lifetime_current = lifetime_current
         self.ELV = 10
-        self.state = CarState.FUNCTIONING
+        self.state = state
         self.brand = brand
         self.parts = parts
         self.break_down_probability = break_down_probability
@@ -93,10 +94,10 @@ class Car:
         self.state = CarState.FUNCTIONING
 
     def increment_lifetime(self):
-        self.life_time_current += 1
+        self.lifetime_current += 1
 
     def to_break_down(self):
-        if self.life_time_current == self.ELV:
+        if self.lifetime_current == self.ELV:
             self.state = CarState.END_OF_LIFE
 
         elif random.random() < self.break_down_probability:
