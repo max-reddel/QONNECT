@@ -453,6 +453,13 @@ class CarManufacturer(GenericAgent):
 
         return next_parts
 
+    def update(self):
+        """
+        Update prices and demand for the next instant depending on the sales developed within the last two instants.
+        """
+        self.adjust_future_prices(component=Component.CARS)
+        self.adjust_future_demand(component=Component.PARTS)
+
 
 class User(GenericAgent):
     """
