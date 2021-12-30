@@ -183,11 +183,11 @@ class GenericAgent(Agent):
         """
         pass
 
-    def update_demand(self):
+    def update(self):
         """
         Update own demand for next round. E.g., see how much this agent had to supply versus how much stock there was.
         # TODO: Currently, the demand for the next round equals the default demand. Improve!
-        # TODO: This function could maybe also used to adjust prices, etc. for the next round.
+        # TODO: This function could also be used to adjust prices, etc. for the next round.
         """
         self.demand = self.default_demand.copy()
 

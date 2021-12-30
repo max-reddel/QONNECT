@@ -34,7 +34,7 @@ class CEPAIModel(Model):
             self.agent_counts = agent_counts
             self.agent_counts[CarManufacturer] = len(self.brands)
 
-        self.schedule = StagedActivation(self, stage_list=["get_all_components", "process_components", "update_demand"])
+        self.schedule = StagedActivation(self, stage_list=["get_all_components", "process_components", "update"])
 
         self.all_agents = self.create_all_agents()
 
