@@ -24,17 +24,17 @@ class CEPAIModel(Model):
             self.agent_counts = {
                 PartsManufacturer: 3,
                 Refiner: 3,
-                Recycler: 2,
+                Recycler: 1,
                 CarManufacturer: len(self.brands),
-                User: 1,
-                Garage: 1,
-                Dismantler: 1
+                User: 3,
+                Garage: 2,
+                Dismantler: 1,
             }
         else:
             self.agent_counts = agent_counts
             self.agent_counts[CarManufacturer] = len(self.brands)
 
-        self.schedule = StagedActivation(self, stage_list=["get_all_components", "process_components", "update_demand"])
+        self.schedule = StagedActivation(self, stage_list=["get_all_components", "process_components", "update"])
 
         self.all_agents = self.create_all_agents()
 

@@ -1,4 +1,5 @@
 from enum import Enum
+from random import normalvariate
 
 
 class Component(Enum):
@@ -10,6 +11,26 @@ class Component(Enum):
     RECYCLATE_HIGH = 3
     PARTS = 4
     CARS = 5
+    DISCARDED_PARTS = 6 # This includes the parts that can not be reused anymore and are sent for shredding
+    CARS_FOR_SHREDDER = 7
+    CARS_FOR_DISMANTLER = 8
+
+    def get_random_price(self):
+        """
+        Sample the price for a component.
+        :return:
+            price: float
+        """
+        price = 1.0
+
+        if self == Component.VIRGIN or self == Component.RECYCLATE_LOW or self == Component.RECYCLATE_HIGH:
+            price = normalvariate(mu=2.5, sigma=0.2)
+        elif self == Component.PARTS:
+            price = normalvariate(mu=10.0, sigma=2.0)
+        elif self == Component.CARS:
+            price = normalvariate(mu=100.0, sigma=5.0)
+
+        return price
 
 
 class PartState(Enum):
@@ -26,6 +47,7 @@ class CarState(Enum):
     """
     BROKEN = 0
     FUNCTIONING = 1
+    TOTAL_LOSS = 2
 
 
 class Brand(Enum):
