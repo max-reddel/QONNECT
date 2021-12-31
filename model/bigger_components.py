@@ -79,7 +79,7 @@ class Car:
         part that has been reused is placed at a random place in the parts list.
         """
 
-        if part.state.__eq__(PartState.REUSED):
+        if part.state == PartState.REUSED:
             part_index = random.randint(0, len(self.parts)-1)
 
             for i in range(part_index):
@@ -97,7 +97,7 @@ class Car:
         self.lifetime_current += 1
 
     def to_break_down(self):
-        if self.lifetime_current == self.ELV:
+        if self.lifetime_current >= self.ELV:
             self.state = CarState.END_OF_LIFE
 
         elif random.random() < self.break_down_probability:

@@ -437,12 +437,18 @@ class User(GenericAgent):
         Bring car to garage of choice in case it is broken or total loss. Currently, garage is randomly chosen.
         # TODO: choose garage based on price of parts
         """
-        if car.state.__eq__(CarState.BROKEN):
+        # if car.state != CarState.FUNCTIONING:
+        # if car.state == (CarState.BROKEN or CarState.END_OF_LIFE):
+        #     garages = self.all_agents[Garage]
+        #     garage_of_choice = self.random.choice(garages)
+        #     garage_of_choice.receive_car_from_user(user=self, car=car)
+
+        if car.state == CarState.BROKEN:
             garages = self.all_agents[Garage]
             garage_of_choice = self.random.choice(garages)
             garage_of_choice.receive_car_from_user(user=self, car=car)
             self.car_repair = True
-        elif car.state.__eq__(CarState.END_OF_LIFE):
+        elif car.state == CarState.END_OF_LIFE:
             garages = self.all_agents[Garage]
             garage_of_choice = self.random.choice(garages)
             garage_of_choice.receive_car_from_user(user=self, car=car)
@@ -481,7 +487,7 @@ class Garage(GenericAgent):
         self.prices[Component.PARTS] = self.random.normalvariate(mu=4, sigma=0.2)  # cost per unit
 
         self.stock[Component.CARS] = []
-        self.stock[Component.PARTS] = []
+        self.stock[Component.PARTS] = [Part() for _ in range(5)]
         self.stock[Component.DISCARDED_PARTS] = []
         self.stock[Component.CARS_FOR_SHREDDER] = []
         self.stock[Component.CARS_FOR_DISMANTLER] = []
@@ -507,12 +513,13 @@ class Garage(GenericAgent):
         component = Component.CARS
         self.demand[component] = 1  # To make functions work for receiving cars.
 
-        self.get_component_from_suppliers(suppliers=user, component=component)
+        self.get_component_from_suppliers(suppliers=[user], component=component)
 
-        if car.state.__eq__(CarState.BROKEN):
+        if car.state == CarState.BROKEN:
             self.customer_base[car] = user
+            user.car_repair = True
 
-        elif car.state.__eq__(CarState.END_OF_LIFE):
+        elif car.state == CarState.END_OF_LIFE:  # TODO: remove car from stock list
             if self.random.random() < self.circularity_friendliness:
                 self.stock[Component.CARS_FOR_DISMANTLER].append(car)
             else:
@@ -527,10 +534,13 @@ class Garage(GenericAgent):
         cars_to_be_repaired = self.stock[Component.CARS]
         while self.stock[Component.PARTS]:
 
+            if not cars_to_be_repaired:
+                break
             car = cars_to_be_repaired[0]
             cars_to_be_repaired = cars_to_be_repaired[1:]
 
-            if car.state.__eq__(CarState.BROKEN):
+            if car.state == CarState.BROKEN:
+
                 part = self.stock[Component.PARTS][0]
                 self.stock[Component.PARTS] = self.stock[Component.PARTS][1:]
 
@@ -538,8 +548,10 @@ class Garage(GenericAgent):
                 self.stock[Component.DISCARDED_PARTS].append(removed_part)
                 car.repair_car(part)
 
-                self.provide(recepient=self.customer_base[car], component=Component.CARS, amount=1)
-                self.customer_base[car].car_repair = False
+                user = self.customer_base[car]
+                self.provide(recepient=user, component=Component.CARS, amount=1)
+                user.car_repair = False
+                self.customer_base.pop(car)
 
     def process_components(self):
         self.repair_and_return_cars()
