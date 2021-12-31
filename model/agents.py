@@ -69,6 +69,9 @@ class GenericAgent(Agent):
             Component.RECYCLATE_HIGH: 0.0
         }
 
+        # Track how much was sold last tick and the the tick before that
+        self.sold_volume = {'last': 0, 'second_last': 0}
+
     def get_all_components(self):
         """
         Determine the order of suppliers by personal preference and then buy components.
@@ -105,10 +108,12 @@ class GenericAgent(Agent):
             if self.sufficient_stock(rest_demand, stock_of_supplier):
                 supplier.provide(recepient=self, component=component, amount=rest_demand)
                 self.reduce_current_demand(supplies=rest_demand, component=component)
+                supplier.register_sales(rest_demand)
             else:
                 rest_stock = self.get_rest_stock(stock_of_supplier)
                 supplier.provide(recepient=self, component=component, amount=rest_stock)
                 self.reduce_current_demand(supplies=rest_stock, component=component)
+                supplier.register_sales(rest_stock)
 
             # Adjust remaining demand and supplier list
             rest_demand = self.demand[component]
@@ -186,11 +191,9 @@ class GenericAgent(Agent):
         """
         pass
 
-    def update_demand(self):
+    def update(self):
         """
-        Update own demand for next round. E.g., see how much this agent had to supply versus how much stock there was.
-        # TODO: Currently, the demand for the next round equals the default demand. Improve!
-        # TODO: This function could maybe also used to adjust prices, etc. for the next round.
+        Update prices and demand for the next instant depending on the sales developed within the last two instants.
         """
         self.demand = self.default_demand.copy()
 
@@ -210,6 +213,52 @@ class GenericAgent(Agent):
         elif isinstance(stock_of_supplier, list):
             truth = rest_demand <= len(stock_of_supplier)
         return truth
+
+    def register_sales(self, sales):
+        """
+        Register the sales of an agent during the current instant. This can then be used later to adjust prices and e.g.
+        production of components.
+        """
+        if isinstance(sales, float) or isinstance(sales, int):
+            amount = sales
+        elif isinstance(sales, list):
+            amount = len(sales)
+        else:
+            amount = 0
+
+        self.sold_volume['second_last'] = self.sold_volume['last']
+        self.sold_volume['last'] = amount
+
+    def adjust_future_prices(self, component):
+        """
+        Adjust the price of an agent's component for the next instant.
+        :param component: Component
+        """
+        prev_year = self.sold_volume['last']
+        prev_prev_year = self.sold_volume['second_last']
+        noise = self.random.normalvariate(mu=1.0, sigma=0.2)
+
+        if prev_year != 0 and prev_prev_year != 0:
+            self.prices[component] = self.prices[component] * prev_prev_year / prev_year * noise
+        else:
+            self.prices[component] = component.get_random_price()
+
+    def adjust_future_demand(self, component):
+        """
+        Adjust the demand of an agent's component for the next instant.
+        :param component: Component
+        TODO: Doesn't work for agents that get two different components
+        """
+        prev_year = self.sold_volume['last']
+        prev_prev_year = self.sold_volume['second_last']
+        noise = self.random.normalvariate(mu=1.0, sigma=0.2)
+
+        if prev_year != 0 and prev_prev_year != 0:
+            self.demand[component] = self.demand[component] * prev_prev_year / prev_year * noise
+            if component == Component.PARTS or component == Component.CARS:
+                self.demand[component] = round(self.demand[component])
+        else:
+            self.demand[component] = self.default_demand[component]
 
 
 class PartsManufacturer(GenericAgent):
@@ -270,7 +319,7 @@ class PartsManufacturer(GenericAgent):
         }
 
         # Adjust virgin plastic weight such that the sum of all plastic will be 1.0
-        plastic_ratio[Component.VIRGIN] = max(0, 1.0 - sum(plastic_ratio.values()))
+        plastic_ratio[Component.VIRGIN] = max(0.0, 1.0 - sum(plastic_ratio.values()))
 
         return plastic_ratio
 
@@ -291,6 +340,15 @@ class PartsManufacturer(GenericAgent):
         post_shredders_high = self.get_sorted_suppliers(suppliers=post_shredders, component=Component.RECYCLATE_HIGH)
         self.get_component_from_suppliers(suppliers=post_shredders_high, component=Component.RECYCLATE_HIGH)
 
+    def update(self):
+        """
+        Update prices and demand for the next instant depending on the sales developed within the last two instants.
+        """
+        self.adjust_future_prices(component=Component.PARTS)
+        self.adjust_future_demand(component=Component.VIRGIN)
+        self.adjust_future_demand(component=Component.RECYCLATE_LOW)
+        self.adjust_future_demand(component=Component.RECYCLATE_HIGH)
+
 
 class Refiner(GenericAgent):
     """
@@ -306,6 +364,12 @@ class Refiner(GenericAgent):
         super().__init__(unique_id, model, all_agents)
         self.stock[Component.VIRGIN] = math.inf
         self.prices[Component.VIRGIN] = self.random.normalvariate(mu=2.5, sigma=0.2)  # cost per unit
+
+    def update(self):
+        """
+        Update prices for the next instant depending on the sales developed within the last two instants.
+        """
+        self.adjust_future_prices(component=Component.VIRGIN)
 
 
 class Recycler(GenericAgent):
@@ -391,6 +455,13 @@ class CarManufacturer(GenericAgent):
             next_parts = []
 
         return next_parts
+
+    def update(self):
+        """
+        Update prices and demand for the next instant depending on the sales developed within the last two instants.
+        """
+        self.adjust_future_prices(component=Component.CARS)
+        self.adjust_future_demand(component=Component.PARTS)
 
 
 class User(GenericAgent):
