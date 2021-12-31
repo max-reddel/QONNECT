@@ -264,9 +264,9 @@ class PartsManufacturer(GenericAgent):
         plastic_ratio = {
             Component.VIRGIN: 0,
             Component.RECYCLATE_LOW: self.random.uniform(self.minimum_requirements[Component.RECYCLATE_LOW],
-                                                    self.minimum_requirements[Component.RECYCLATE_LOW] * 1.25),
+                                                         self.minimum_requirements[Component.RECYCLATE_LOW] * 1.25),
             Component.RECYCLATE_HIGH: self.random.uniform(self.minimum_requirements[Component.RECYCLATE_HIGH],
-                                                     self.minimum_requirements[Component.RECYCLATE_HIGH] * 1.25)
+                                                          self.minimum_requirements[Component.RECYCLATE_HIGH] * 1.25)
         }
 
         # Adjust virgin plastic weight such that the sum of all plastic will be 1.0
@@ -396,7 +396,6 @@ class CarManufacturer(GenericAgent):
 class User(GenericAgent):
     """
     Car user agent. Can buy a car, use it, and can bring it to a garage for repairs or for discarding it.
-    # TODO: Changes are needed.
     """
 
     def __init__(self, unique_id, model, all_agents, car=None, use_intensity=1):
@@ -408,12 +407,13 @@ class User(GenericAgent):
         super().__init__(unique_id, model, all_agents)
         self.use_intensity = use_intensity
         self.car_repair = False
-
         self.garages = []
+
         if car is None:
             self.stock[Component.CARS] = []
         else:
             self.stock[Component.CARS] = [car]
+
         self.demand[Component.CARS] = 1
         self.default_demand[Component.CARS] = self.demand[Component.CARS]
 
@@ -435,29 +435,42 @@ class User(GenericAgent):
     def bring_car_to_garage(self, car):
         """
         Bring car to garage of choice in case it is broken or total loss. Currently, garage is randomly chosen.
-        # TODO: choose garage based on price of parts
         """
-        # if car.state != CarState.FUNCTIONING:
-        # if car.state == (CarState.BROKEN or CarState.END_OF_LIFE):
-        #     garages = self.all_agents[Garage]
-        #     garage_of_choice = self.random.choice(garages)
-        #     garage_of_choice.receive_car_from_user(user=self, car=car)
 
-        if car.state == CarState.BROKEN:
+        if car.state == (CarState.BROKEN or CarState.END_OF_LIFE):
             garages = self.all_agents[Garage]
-            garage_of_choice = self.random.choice(garages)
+            garages = self.get_sorted_suppliers(suppliers=garages, component=Component.PARTS)
+
+            garage_of_choice = self.select_garage(garages)
             garage_of_choice.receive_car_from_user(user=self, car=car)
-            self.car_repair = True
-        elif car.state == CarState.END_OF_LIFE:
-            garages = self.all_agents[Garage]
-            garage_of_choice = self.random.choice(garages)
-            garage_of_choice.receive_car_from_user(user=self, car=car)
+
+    def select_garage(self, garage_preferences):
+        """
+        Users try to find a garage which has parts. They do so by checking garages on the top of their preference list
+        whether they have parts to repair their car.
+        """
+        selected_garage = None
+        cheapest_garage = garage_preferences[0]
+
+        while garage_preferences:
+            garage = garage_preferences[0]
+            garage_preferences = garage_preferences[:1]
+            stock_of_garage = garage.get_stock()[Component.PARTS]
+
+            if stock_of_garage:
+                selected_garage = garage
+                return selected_garage
+
+        if selected_garage is None:
+            return cheapest_garage
 
     def possess_car(self):
         """
         A user possesses a car. In case its car is not at the garage, the user will bring the car to the garage in case
         it is broken and continues using the car. If it is not broken, it will simply use the car.
-        At the moment the equivalent of process_components.
+        NOTE: it is assumed a car is not for a whole year in the garage. Therefore, the car is still being used the year
+        when it is brought to the garage.
+        At the moment this function is the equivalent of process_components.
         """
         if self.stock[Component.CARS]:
             car = self.stock[Component.CARS][0]
@@ -465,6 +478,10 @@ class User(GenericAgent):
             car.use_car()
 
     def process_components(self):
+        """
+        The possession of a car is considered to be the 'user stage' of the process_components stage 2. However,
+        renaming this function, would not make intuitive sense and might confuse someone trying to read the code.
+        """
         self.possess_car()
 
 
@@ -508,7 +525,6 @@ class Garage(GenericAgent):
         Receive a car from User. Should be initiated by User in case car is broken, it can choose which garage to go to.
         We keep track of which user a car belongs to in the customer base.
         If the car is at the end of its life, the garage decides whether the car goes to the shredder or dismantler.
-        # TODO: merge with get_all_components?
         """
         component = Component.CARS
         self.demand[component] = 1  # To make functions work for receiving cars.
@@ -519,7 +535,8 @@ class Garage(GenericAgent):
             self.customer_base[car] = user
             user.car_repair = True
 
-        elif car.state == CarState.END_OF_LIFE:  # TODO: remove car from stock list
+        elif car.state == CarState.END_OF_LIFE:
+            self.stock[Component.CARS].remove(car)
             if self.random.random() < self.circularity_friendliness:
                 self.stock[Component.CARS_FOR_DISMANTLER].append(car)
             else:
@@ -554,6 +571,11 @@ class Garage(GenericAgent):
                 self.customer_base.pop(car)
 
     def process_components(self):
+        """
+        Repairing and returning cars is considered to be the 'garage stage' of the process_components stage 2.
+        Intuitively, the naming of repairing cars of users makes more sense and therefore changing function names, might
+        confuse someone trying to read the code.
+        """
         self.repair_and_return_cars()
 
 

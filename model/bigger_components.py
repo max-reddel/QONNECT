@@ -104,5 +104,6 @@ class Car:
             self.state = CarState.BROKEN
 
     def use_car(self):  # User calls this function.
-        self.to_break_down()
-        self.increment_lifetime()
+        if self.state == CarState.FUNCTIONING:
+            self.to_break_down()
+            self.increment_lifetime()
