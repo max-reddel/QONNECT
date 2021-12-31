@@ -429,8 +429,10 @@ class User(GenericAgent):
             car_manufacturers = self.all_agents[CarManufacturer]
             car_manufacturers = self.get_sorted_suppliers(suppliers=car_manufacturers, component=Component.CARS)
             self.get_component_from_suppliers(suppliers=car_manufacturers, component=Component.CARS)
-            car = self.stock[Component.CARS][0]
-            car.ELV = car.ELV * self.use_intensity
+
+            if self.stock[Component.CARS]:
+                car = self.stock[Component.CARS][0]
+                car.ELV = car.ELV * self.use_intensity
 
     def bring_car_to_garage(self, car):
         """
@@ -438,23 +440,24 @@ class User(GenericAgent):
         """
 
         if car.state == (CarState.BROKEN or CarState.END_OF_LIFE):
-            garages = self.all_agents[Garage]
-            garages = self.get_sorted_suppliers(suppliers=garages, component=Component.PARTS)
 
-            garage_of_choice = self.select_garage(garages)
+            garage_of_choice = self.select_garage()
             garage_of_choice.receive_car_from_user(user=self, car=car)
 
-    def select_garage(self, garage_preferences):
+    def select_garage(self):
         """
         Users try to find a garage which has parts. They do so by checking garages on the top of their preference list
         whether they have parts to repair their car.
         """
+        garages = self.all_agents[Garage]
+        garage_preferences = self.get_sorted_suppliers(suppliers=garages, component=Component.PARTS)
+
         selected_garage = None
         cheapest_garage = garage_preferences[0]
 
         while garage_preferences:
             garage = garage_preferences[0]
-            garage_preferences = garage_preferences[:1]
+            garage_preferences = garage_preferences[1:]
             stock_of_garage = garage.get_stock()[Component.PARTS]
 
             if stock_of_garage:
@@ -553,6 +556,7 @@ class Garage(GenericAgent):
 
             if not cars_to_be_repaired:
                 break
+
             car = cars_to_be_repaired[0]
             cars_to_be_repaired = cars_to_be_repaired[1:]
 

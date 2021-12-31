@@ -6,8 +6,8 @@ if __name__ == "__main__":
                 Refiner: 3,
                 Recycler: 2,
                 CarManufacturer: 4,
-                User: 10,
-                Garage: 2,
+                User: 1000,
+                Garage: 10,
                 Dismantler: 1
             })
 

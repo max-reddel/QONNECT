@@ -69,7 +69,7 @@ class CEPAIModel(Model):
             if lifetime_current == lifetime_vehicle:
                 state = CarState.FUNCTIONING
             else:
-                state = self.random.choices(list(CarState)[:2], weights=[1,9])
+                state = self.random.choices(list(CarState)[:2], weights=[1, 9])
 
             car = Car(brand=brand, lifetime_current=lifetime_current, state=state, parts=parts)
         return car
