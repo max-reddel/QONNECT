@@ -94,16 +94,22 @@ class Car:
         self.state = CarState.FUNCTIONING
 
     def increment_lifetime(self):
-        self.lifetime_current += 1
+        """
+        A car is only being used when it is functioning.
+        """
+        if self.state == CarState.FUNCTIONING:
+            self.lifetime_current += 1
 
     def to_break_down(self):
+        """
+        A car can break down when it is functioning. It may also have reached its end of life.
+        """
         if self.lifetime_current >= self.ELV:
             self.state = CarState.END_OF_LIFE
 
-        elif random.random() < self.break_down_probability:
+        elif random.random() < self.break_down_probability and self.state == CarState.FUNCTIONING:
             self.state = CarState.BROKEN
 
     def use_car(self):  # User calls this function.
-        if self.state == CarState.FUNCTIONING:
-            self.to_break_down()
-            self.increment_lifetime()
+        self.to_break_down()
+        self.increment_lifetime()
