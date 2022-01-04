@@ -5,7 +5,6 @@ This module contains the Preferences class.
 import pandas as pd
 from model.enumerations import *
 
-
 class Preferences:
     """
     This class describes the preferences of a single agent at an instant.

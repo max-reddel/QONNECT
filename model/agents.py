@@ -34,8 +34,11 @@ class GenericAgent(Agent):
             Component.VIRGIN: 0.0,
             Component.RECYCLATE_LOW: 0.0,
             Component.RECYCLATE_HIGH: 0.0,
+            Component.DISCARDED_PARTS: [],
             Component.PARTS: [],
-            Component.CARS: []
+            Component.CARS: [],
+            Component.CARS_FOR_SHREDDER: [],
+            Component.CARS_FOR_DISMANTLER: []
         }
 
         # Demand of specific components
@@ -48,13 +51,7 @@ class GenericAgent(Agent):
         }
 
         # Default Demand of specific components
-        self.default_demand = {
-            Component.VIRGIN: 0.0,
-            Component.RECYCLATE_LOW: 0.0,
-            Component.RECYCLATE_HIGH: 0.0,
-            Component.PARTS: 0,
-            Component.CARS: 0
-        }
+        self.default_demand = self.demand.copy()
 
         # Prices for specific components
         self.prices = {
@@ -65,21 +62,15 @@ class GenericAgent(Agent):
             Component.CARS: math.inf
         }
 
-        # Stock goals of specific components (how much does an agent want to have in their own stock at each instant)
-        self.stock_goals = {
-            Component.VIRGIN: 0.0,
-            Component.RECYCLATE_LOW: 0.0,
-            Component.RECYCLATE_HIGH: 0.0,
-            Component.PARTS: 0,
-            Component.CARS: 0
-        }
-
-        # Minimum requirements given by law or car designers
+        # Minimum requirements given by law or car designer
         self.minimum_requirements = {
             PartState.REUSED: 0.0,
             Component.RECYCLATE_LOW: 0.0,
             Component.RECYCLATE_HIGH: 0.0
         }
+
+        # Track how much was sold last tick and the the tick before that
+        self.sold_volume = {'last': 0, 'second_last': 0}
 
     def get_all_components(self):
         """
@@ -117,10 +108,12 @@ class GenericAgent(Agent):
             if self.sufficient_stock(rest_demand, stock_of_supplier):
                 supplier.provide(recepient=self, component=component, amount=rest_demand)
                 self.reduce_current_demand(supplies=rest_demand, component=component)
+                supplier.register_sales(rest_demand)
             else:
                 rest_stock = self.get_rest_stock(stock_of_supplier)
                 supplier.provide(recepient=self, component=component, amount=rest_stock)
                 self.reduce_current_demand(supplies=rest_stock, component=component)
+                supplier.register_sales(rest_stock)
 
             # Adjust remaining demand and supplier list
             rest_demand = self.demand[component]
@@ -174,7 +167,7 @@ class GenericAgent(Agent):
         if isinstance(self.stock[component], float) or isinstance(self.stock[component], int):
             self.stock[component] += amount
         elif isinstance(self.stock[component], list):
-            self.stock[component] + supplies
+            self.stock[component] += supplies
 
     def get_stock(self):
         """
@@ -194,9 +187,8 @@ class GenericAgent(Agent):
 
     def process_components(self):
         """
-        Process goods (manufactuging, shredding, using, or repairing).
+        Process goods (manufacturing, shredding, using, or repairing).
         """
-        # TODO: Implement this while using some kind of combination of plastics under specific constraints.
         pass
 
     def update(self):
@@ -242,34 +234,32 @@ class GenericAgent(Agent):
         Adjust the price of an agent's component for the next instant.
         :param component: Component
         """
-        pass
-        # prev_year = self.sold_volume['last']
-        # prev_prev_year = self.sold_volume['second_last']
-        # noise = self.random.normalvariate(mu=1.0, sigma=0.2)
+        prev_year = self.sold_volume['last']
+        prev_prev_year = self.sold_volume['second_last']
+        noise = self.random.normalvariate(mu=1.0, sigma=0.2)
 
-        # if prev_year != 0 and prev_prev_year != 0:
-        #     self.prices[component] = self.prices[component] * prev_prev_year / prev_year * noise
-        # else:
-        #     self.prices[component] = component.get_random_price()
+        if prev_year != 0 and prev_prev_year != 0:
+            self.prices[component] = self.prices[component] * prev_year / prev_prev_year * noise
+        else:
+            self.prices[component] = component.get_random_price()
 
-# adjust_future_prices and adjust_future_demand are not implemented in this branch hence can not be tested for current implementations
     def adjust_future_demand(self, component):
         """
         Adjust the demand of an agent's component for the next instant.
         :param component: Component
-        TODO: Doesn't work for agents that get two different components
+        TODO: Doesn't work for agents (only not PMs and CMs?) that get two different components
         """
-        pass
-        #prev_year = self.sold_volume['last']
-        #prev_prev_year = self.sold_volume['second_last']
-        #noise = self.random.normalvariate(mu=1.0, sigma=0.2)
+        prev_year = self.sold_volume['last']
+        prev_prev_year = self.sold_volume['second_last']
+        noise = self.random.normalvariate(mu=1.0, sigma=0.2)
 
-        #if prev_year != 0 and prev_prev_year != 0:
-        #    self.demand[component] = self.demand[component] * prev_prev_year / prev_year * noise
-        #    if component == Component.PARTS or component == Component.CARS:
-        #        self.demand[component] = round(self.demand[component])
-        #else:
-        #    self.demand[component] = self.default_demand[component]
+        if prev_year != 0 and prev_prev_year != 0:
+            self.demand[component] = self.demand[component] * prev_year / prev_prev_year * noise
+            if component == Component.PARTS or component == Component.CARS:
+                self.demand[component] = round(self.demand[component])
+        else:
+            self.demand[component] = self.default_demand[component]
+
 
 class PartsManufacturer(GenericAgent):
     """
@@ -322,9 +312,9 @@ class PartsManufacturer(GenericAgent):
         plastic_ratio = {
             Component.VIRGIN: 0,
             Component.RECYCLATE_LOW: self.random.uniform(self.minimum_requirements[Component.RECYCLATE_LOW],
-                                                    self.minimum_requirements[Component.RECYCLATE_LOW] * 1.25),
+                                                         self.minimum_requirements[Component.RECYCLATE_LOW] * 1.25),
             Component.RECYCLATE_HIGH: self.random.uniform(self.minimum_requirements[Component.RECYCLATE_HIGH],
-                                                     self.minimum_requirements[Component.RECYCLATE_HIGH] * 1.25)
+                                                          self.minimum_requirements[Component.RECYCLATE_HIGH] * 1.25)
         }
 
         # Adjust virgin plastic weight such that the sum of all plastic will be 1.0
@@ -381,205 +371,6 @@ class Refiner(GenericAgent):
         self.adjust_future_prices(component=Component.VIRGIN)
 
 
-class CarManufacturer(GenericAgent):
-    """
-    CarManufcaturer agent which transforms parts into cars.
-    """
-
-    def __init__(self, unique_id, model, all_agents, brand):
-        """
-        :param unique_id: int
-        :param model: CEPAIModel
-        :param all_agents: dictionary with {Agent: list of Agents}
-        """
-        super().__init__(unique_id, model, all_agents)
-
-        self.brand = brand
-
-        self.stock[Component.PARTS] = [Part() for _ in range(100)]
-        self.stock[Component.CARS] = [Car(self.brand) for _ in range(10)]
-
-        self.prices[Component.PARTS] = self.random.normalvariate(mu=2.5, sigma=0.2)  # cost per unit
-        self.prices[Component.CARS] = self.random.normalvariate(mu=1000.0, sigma=0.2)  # cost per unit
-
-        self.demand[Component.PARTS] = round(self.random.normalvariate(mu=100.0, sigma=2))
-        self.demand[Component.CARS] = round(self.random.normalvariate(mu=10.0, sigma=2))  # aim to produce
-        self.default_demand[Component.PARTS] = self.demand[Component.PARTS]
-
-    def get_all_components(self):
-        """
-        Determine the order of suppliers by personal preference and then buy components.
-        """
-        # Suppliers
-        parts_manufacturers = self.all_agents[PartsManufacturer]
-        parts_manufacturers = self.get_sorted_suppliers(suppliers=parts_manufacturers, component=Component.PARTS)
-        self.get_component_from_suppliers(suppliers=parts_manufacturers, component=Component.PARTS)
-
-    def process_components(self):
-        """
-        Manufacture specific amount of cars.
-        """
-        for _ in range(self.demand[Component.CARS]):
-            parts = self.get_next_parts(nr_of_parts=4)
-            if not parts:
-                break
-            else:
-                new_car = Car(brand=self.brand, parts=parts)
-                self.stock[Component.CARS].append(new_car)
-
-    def get_next_parts(self, nr_of_parts=4):
-        """
-        Get the next four parts from stock and return them to create a car with them.
-        :param nr_of_parts: int: indicates how many parts a car needs to be fully assembled
-        :return:
-            next_parts: list with Parts
-        """
-        all_parts = self.stock[Component.PARTS]
-
-        if len(all_parts) >= nr_of_parts:
-            next_parts = all_parts[:4]
-        else:
-            next_parts = []
-
-        return next_parts
-
-    def update(self):
-        """
-        Update prices and demand for the next instant depending on the sales developed within the last two instants.
-        """
-        self.adjust_future_prices(component=Component.CARS)
-        self.adjust_future_demand(component=Component.PARTS)
-
-
-class User(GenericAgent):
-    """
-    Car user agent. Can buy a car, use it, and can bring it to a garage for repairs or for discarding it.
-    # TODO: Changes are needed.
-    """
-
-    def __init__(self, unique_id, model, all_agents):
-        """
-         :param unique_id: int
-         :param model: CEPAIModel
-         :param all_agents: dictionary with {Agent: list of Agents}
-         """
-        super().__init__(unique_id, model, all_agents)
-        self.car_repair = False
-
-        self.stock[Component.CARS] = []
-        self.demand[Component.CARS] = 1
-        self.default_demand[Component.CARS] = self.demand[Component.CARS]
-
-    def get_all_components(self):
-        """
-        Determine the order of suppliers by personal preference and then buy components.
-        For a user this function buys a car of a car manufacturer when it has no car in possession and its car is not
-        being repaired at a garage.
-        """
-        self.garages = self.all_agents[Garage]
-        if len(self.stock[Component.CARS]) == 0 and not self.car_repair:
-            car_manufacturers = self.all_agents[CarManufacturer]
-            car_manufacturers = self.get_sorted_suppliers(suppliers=car_manufacturers, component=Component.CARS)
-            self.get_component_from_suppliers(suppliers=car_manufacturers, component=Component.CARS)
-
-    def bring_car_to_garage(self, car):
-        """
-        Bring car to garage of choice in case it is broken or total loss. Currently, garage is randomly chosen.
-        """
-        if car.state == CarState.BROKEN:
-            garage_of_choice = self.random.choice(self.garages)
-            garage_of_choice.receive_car_from_user(user=self, car=car)
-            self.car_repair = True
-        elif car.state == CarState.TOTAL_LOSS:
-            garage_of_choice = self.random.choice(self.garages)
-            garage_of_choice.receive_car_from_user(user=self, car=car)
-
-    def possess_car(self):
-        if len(self.stock[Component.CARS]) == 1:
-            car = self.stock[Component.CARS][0]
-            self.bring_car_to_garage(car)
-            car.use_car()
-
-
-class Garage(GenericAgent):
-    """
-    This agent was used to validate the car buying behavior.
-    """
-
-    def __init__(self, unique_id, model, all_agents):
-        """
-         :param unique_id: int
-         :param model: CEPAIModel
-         :param all_agents: dictionary with {Agent: list of Agents}
-        """
-        super().__init__(unique_id, model, all_agents)
-
-        self.customer_base = {}
-
-        self.stock[Component.CARS] = []
-        self.stock[Component.PARTS] = []
-        # Extra Enum for stock of parts to be discarded? May also be nice for dismantlers!
-        brands = []
-        for brand in Brand:
-            brands.append(str(brand).rpartition('.')[2])
-        self.stock[Component.CARS_FOR_SHREDDER] = [Car(brand=self.random.choice(brands)) for _ in range(10)]
-        self.stock[Component.CARS_FOR_DISMANTLER] = [Car(brand=self.random.choice(brands)) for _ in range(10)]
-        
-
-        self.demand[Component.PARTS] = round(self.random.normalvariate(mu=100.0, sigma=2))
-        self.default_demand[Component.PARTS] = self.demand[Component.PARTS]
-
-    def get_all_components(self):
-        """
-        Determine the order of suppliers by personal preference and then buy components.
-        """
-        parts_suppliers = self.all_agents[PartsManufacturer] + self.all_agents[Dismantler]
-        parts_suppliers = self.get_sorted_suppliers(suppliers=parts_suppliers, component=Component.PARTS)
-        self.get_component_from_suppliers(suppliers=parts_suppliers, component=Component.PARTS)
-
-    def receive_car_from_user(self, user, car):
-        """
-        Receive a car from User. Should be initiated by User in case car is broken, it can choose which garage to go to.
-        We keep track of which user a car belongs to in the customer base.
-        """
-        component = Component.CARS
-        self.demand[component] = 1  # To make functions work for receiving cars.
-
-        self.get_component_from_suppliers(suppliers=user, component=component)
-
-        if car.state == CarState.BROKEN:
-            self.customer_base[car] = user
-
-    def repair_and_return_cars(self):
-        """
-        In the Car class is defined which component is broken and needs to be replaced, currently limited to one part.
-        This function simply replaces that part.
-        """
-        cars_to_be_repaired = self.stock[Component.CARS]
-        while self.stock[Component.PARTS]:
-
-            car = cars_to_be_repaired[0]
-            cars_to_be_repaired = cars_to_be_repaired[1:]
-
-            if car.state == CarState.BROKEN:
-                part = self.stock[Component.PARTS][0]
-                self.stock[Component.PARTS] = self.stock[Component.PARTS][1:]
-
-                car.repair_car(part)
-
-                self.provide(recepient=self.customer_base[car], component=Component.CARS, amount=1)
-
-    def supply_cars(self):
-        """
-        Not sure yet whether is needed. Provide cars to dismantlers and shredders.
-        We can also make a list with cars to be recycled and simply call get_all_components for example.
-        """
-        # cars_to_discard = self.stock[Component.CARS]
-        # for car in cars_to_discard:
-        #     if car.state == CarState.TOTAL_LOSS:
-        #         # Supply to either dismantler or shredder
-        # pass
-
 class Recycler(GenericAgent):
     """
     Recycler and Postshredder agent.
@@ -614,7 +405,6 @@ class Recycler(GenericAgent):
         """
 
     def process_components(self):
-        pass
         # return super().process_components()
 
         # Shred discarded parts to extract plastic
@@ -690,6 +480,304 @@ class Recycler(GenericAgent):
         """
         self.adjust_future_prices(component=Component.RECYCLATE_LOW)
         self.adjust_future_prices(component=Component.RECYCLATE_HIGH)
+
+class CarManufacturer(GenericAgent):
+    """
+    CarManufcaturer agent which transforms parts into cars.
+    """
+
+    def __init__(self, unique_id, model, all_agents, brand):
+        """
+        :param unique_id: int
+        :param model: CEPAIModel
+        :param all_agents: dictionary with {Agent: list of Agents}
+        """
+        super().__init__(unique_id, model, all_agents)
+
+        self.brand = brand
+
+        self.stock[Component.PARTS] = [Part() for _ in range(100)]
+        self.stock[Component.CARS] = [Car(self.brand) for _ in range(10)]
+
+        self.prices[Component.PARTS] = self.random.normalvariate(mu=2.5, sigma=0.2)  # cost per unit
+        self.prices[Component.CARS] = self.random.normalvariate(mu=1000.0, sigma=0.2)  # cost per unit
+
+        self.demand[Component.PARTS] = round(self.random.normalvariate(mu=100.0, sigma=2))
+        self.demand[Component.CARS] = round(self.random.normalvariate(mu=10.0, sigma=2))  # aim to produce
+        self.default_demand[Component.PARTS] = self.demand[Component.PARTS]
+
+        self.current_year_sales = 0
+
+    def get_all_components(self):
+        """
+        Determine the order of suppliers by personal preference and then buy components.
+        """
+        # Suppliers
+        parts_manufacturers = self.all_agents[PartsManufacturer]
+        parts_manufacturers = self.get_sorted_suppliers(suppliers=parts_manufacturers, component=Component.PARTS)
+        self.get_component_from_suppliers(suppliers=parts_manufacturers, component=Component.PARTS)
+
+    def process_components(self):
+        """
+        Manufacture specific amount of cars.
+        """
+        for _ in range(self.demand[Component.CARS]):
+            parts = self.get_next_parts(nr_of_parts=4)
+            if not parts:
+                break
+            else:
+                new_car = Car(brand=self.brand, parts=parts)
+                self.stock[Component.CARS].append(new_car)
+
+    def get_next_parts(self, nr_of_parts=4):
+        """
+        Get the next four parts from stock and return them to create a car with them.
+        :param nr_of_parts: int: indicates how many parts a car needs to be fully assembled
+        :return:
+            next_parts: list with Parts
+        """
+        all_parts = self.stock[Component.PARTS]
+
+        if len(all_parts) >= nr_of_parts:
+            next_parts = all_parts[:4]
+        else:
+            next_parts = []
+
+        return next_parts
+
+    def update(self):
+        """
+        Update sold volumes.
+        Update prices and demand for the next instant depending on the sales developed within the last two instants.
+        """
+        self.sold_volume['second_last'] = self.sold_volume['last']
+        self.sold_volume['last'] = self.current_year_sales
+
+        self.adjust_future_prices(component=Component.CARS)
+        self.adjust_future_demand(component=Component.PARTS)
+
+        self.current_year_sales = 0
+
+    def register_sales(self, sales):
+        """
+        In the current conceptualisation, users buy cars themselves from car manufacturers which means this function is
+        called everytime this happens. The general register_sales function can therefore not be used for this purpose.
+        Instead, this function keeps track of their sales in another manner.
+        """
+        self.current_year_sales += sales
+
+
+class User(GenericAgent):
+    """
+    Car user agent. Can buy a car, use it, and can bring it to a garage for repairs or for discarding it.
+    """
+
+    def __init__(self, unique_id, model, all_agents, car=None, use_intensity=1):
+        """
+         :param unique_id: int
+         :param model: CEPAIModel
+         :param all_agents: dictionary with {Agent: list of Agents}
+         """
+        super().__init__(unique_id, model, all_agents)
+        self.use_intensity = use_intensity
+        self.car_repair = False
+        self.garages = []
+
+        if car is None:
+            self.stock[Component.CARS] = []
+        else:
+            self.stock[Component.CARS] = [car]
+
+        self.demand[Component.CARS] = 1
+        self.default_demand[Component.CARS] = self.demand[Component.CARS]
+
+    def get_all_components(self):
+        """
+        Determine the order of suppliers by personal preference and then buy components.
+        For a user this function buys a car of a car manufacturer when it has no car in possession and its car is not
+        being repaired at a garage.
+        When the user has bought the car, the ELV of the car is corrected by the intensity of use of the car.
+        """
+
+        if not self.stock[Component.CARS] and not self.car_repair:
+            car_manufacturers = self.all_agents[CarManufacturer]
+            car_manufacturers = self.get_sorted_suppliers(suppliers=car_manufacturers, component=Component.CARS)
+            self.get_component_from_suppliers(suppliers=car_manufacturers, component=Component.CARS)
+
+            if self.stock[Component.CARS]:
+                car = self.stock[Component.CARS][0]
+                car.ELV = car.ELV * self.use_intensity
+
+    def bring_car_to_garage(self, car):
+        """
+        Bring car to garage of choice in case it is broken or total loss. Currently, garage is randomly chosen.
+        """
+
+        if car.state == (CarState.BROKEN or CarState.END_OF_LIFE):
+
+            garage_of_choice = self.select_garage()
+            garage_of_choice.receive_car_from_user(user=self, car=car)
+
+    def select_garage(self):
+        """
+        Users try to find a garage which has parts. They do so by checking garages on the top of their preference list
+        whether they have parts to repair their car.
+        """
+        garages = self.all_agents[Garage]
+        garage_preferences = self.get_sorted_suppliers(suppliers=garages, component=Component.PARTS)
+
+        selected_garage = None
+        cheapest_garage = garage_preferences[0]
+
+        while garage_preferences:
+            garage = garage_preferences[0]
+            garage_preferences = garage_preferences[1:]
+            stock_of_garage = garage.get_stock()[Component.PARTS]
+
+            if stock_of_garage:
+                selected_garage = garage
+                return selected_garage
+
+        if selected_garage is None:
+            return cheapest_garage
+
+    def possess_car(self):
+        """
+        A user possesses a car. In case its car is not at the garage, the user will bring the car to the garage in case
+        it is broken and continues using the car. If it is not broken, it will simply use the car.
+        NOTE: it is assumed a car is not for a whole year in the garage. Therefore, the car is still being used the year
+        when it is brought to the garage.
+        At the moment this function is the equivalent of process_components.
+        """
+        if self.stock[Component.CARS]:
+            car = self.stock[Component.CARS][0]
+            self.bring_car_to_garage(car)
+            car.use_car()
+
+    def process_components(self):
+        """
+        The possession of a car is considered to be the 'user stage' of the process_components stage 2. However,
+        renaming this function, would not make intuitive sense and might confuse someone trying to read the code.
+        """
+        self.possess_car()
+
+    def update(self):
+        """
+        Ensure a user always buys one car in case it does.
+        """
+        self.demand = self.default_demand
+
+
+class Garage(GenericAgent):
+    """
+    This agent was used to validate the car buying behavior.
+    """
+
+    def __init__(self, unique_id, model, all_agents, circularity_friendliness=0.2):
+        """
+         :param unique_id: int
+         :param model: CEPAIModel
+         :param all_agents: dictionary with {Agent: list of Agents}
+        """
+        super().__init__(unique_id, model, all_agents)
+
+        self.customer_base = {}
+        self.circularity_friendliness = circularity_friendliness
+
+        self.prices[Component.PARTS] = self.random.normalvariate(mu=4, sigma=0.2)  # cost per unit
+
+        self.stock[Component.CARS] = []
+        self.stock[Component.PARTS] = [Part() for _ in range(5)]
+        self.stock[Component.DISCARDED_PARTS] = []
+        self.stock[Component.CARS_FOR_SHREDDER] = []
+        self.stock[Component.CARS_FOR_DISMANTLER] = []
+
+        self.demand[Component.PARTS] = round(self.random.normalvariate(mu=100.0, sigma=2))
+        self.default_demand[Component.PARTS] = self.demand[Component.PARTS]
+
+        self.current_year_demand = 0
+
+    def get_all_components(self):
+        """
+        Determine the order of suppliers by personal preference and then buy components.
+        """
+        parts_suppliers = self.all_agents[PartsManufacturer] + self.all_agents[Dismantler]
+        parts_suppliers = self.get_sorted_suppliers(suppliers=parts_suppliers, component=Component.PARTS)
+        self.get_component_from_suppliers(suppliers=parts_suppliers, component=Component.PARTS)
+
+    def receive_car_from_user(self, user, car):
+        """
+        Receive a car from User. Should be initiated by User in case car is broken, it can choose which garage to go to.
+        We keep track of which user a car belongs to in the customer base.
+        If the car is at the end of its life, the garage decides whether the car goes to the shredder or dismantler.
+        """
+        component = Component.CARS
+        self.demand[component] = 1  # To make functions work for receiving cars.
+
+        self.get_component_from_suppliers(suppliers=[user], component=component)
+
+        if car.state == CarState.BROKEN:
+            self.customer_base[car] = user
+            user.car_repair = True
+
+            self.current_year_demand += 1
+
+        elif car.state == CarState.END_OF_LIFE:
+            self.stock[Component.CARS].remove(car)
+            if self.random.random() < self.circularity_friendliness:
+                self.stock[Component.CARS_FOR_DISMANTLER].append(car)
+            else:
+                self.stock[Component.CARS_FOR_SHREDDER].append(car)
+
+    def repair_and_return_cars(self):
+        """
+        In the Car class is defined which component is broken and needs to be replaced, currently limited to one part.
+        This function simply replaces that part.
+        At the moment the equivalent of process_components.
+        """
+        cars_to_be_repaired = self.stock[Component.CARS]
+        while self.stock[Component.PARTS]:
+
+            if not cars_to_be_repaired:
+                break
+
+            car = cars_to_be_repaired[0]
+            cars_to_be_repaired = cars_to_be_repaired[1:]
+
+            if car.state == CarState.BROKEN:
+
+                part = self.stock[Component.PARTS][0]
+                self.stock[Component.PARTS] = self.stock[Component.PARTS][1:]
+
+                removed_part = car.parts[0]
+                self.stock[Component.DISCARDED_PARTS].append(removed_part)
+                car.repair_car(part)
+
+                user = self.customer_base[car]
+                self.provide(recepient=user, component=Component.CARS, amount=1)
+                user.car_repair = False
+                self.customer_base.pop(car)
+
+    def process_components(self):
+        """
+        Repairing and returning cars is considered to be the 'garage stage' of the process_components stage 2.
+        Intuitively, the naming of repairing cars of users makes more sense and therefore changing function names, might
+        confuse someone trying to read the code.
+        """
+        self.repair_and_return_cars()
+
+    def update(self):
+        """
+        Update yearly demand for parts, because garages can see actual demand for their parts.
+        Update prices and demand for the next instant depending on the sales developed within the last two instants.
+        """
+        self.sold_volume['second_last'] = self.sold_volume['last']
+        self.sold_volume['last'] = self.current_year_demand
+
+        self.adjust_future_prices(component=Component.PARTS)
+        self.adjust_future_demand(component=Component.PARTS)
+
+        self.current_year_demand = 0
 
 
 class Dismantler(GenericAgent):
