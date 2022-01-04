@@ -25,7 +25,7 @@ class CEPAIModel(Model):
                 Refiner: 3,
                 Recycler: 1,
                 CarManufacturer: len(self.brands),
-                User: 100,
+                User: 10,
                 Garage: 2,
                 Dismantler: 1
             }

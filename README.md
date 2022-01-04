@@ -41,10 +41,16 @@ We ran into quite some problems with the two-stage-process of the agents. The po
 Now, the `GenericAgent` has the following three stages:
 - `get_all_components()` which gets or buys components from the agent's corresponding suppliers.
 - `process_components()` which manufactures, uses, or repairs specific components.
-- `update_demand()` which updates the agent's demand for the next instant.
+- `update()` which updates the agent's demand for the next instant.
 
 #### Example
 Let's say for instance, a `PartsManufacturer` `pm1` is activated. This agent wants first to buy plastic from the `Refiner`s and `Recycler`s. The agent `pm1` will compute its preferences and thus determine to which supplier `pm1` wants to go to first to attempt to buy a specific kind of plastic. Then, it will go through the suppliers according to these preferences. When `pm1` is done with buying all plastic that it demands, it can execute the second step. Now, `pm1` will manufacture parts out of plastic. In the last step, `pm1` will adjust its demand for the next instant. When `pm1` is all done, the next `PartsManufacturer` can be activated and so on. 
+
+**I checked the source code of the Mesa time module, and actually it will execute stage 1 for all agents first, then the second stage for all agents and then the third stage for all agents.** 
+
+*Suggestion for change:*
+
+Let's say for instance, a `PartsManufacturer` `pm1` is activated. This agent wants first to buy plastic from the `Refiner`s and `Recycler`s. The agent `pm1` will compute its preferences and thus determine to which supplier `pm1` wants to go to first to attempt to buy a specific kind of plastic. Then, it will go through the suppliers according to these preferences. When `pm1` is done with buying all plastic that it demands, it is the turn of the next `PartsManufacturer` `pm2`. When all agents executed the first stage, `pm1` will manufacture parts out of plastic and other agents will follow when it is finished. In the last step, `pm1` will adjust its demand for the next instant followed by the other agents.
 
 ### 2.2 Changes in Components
 

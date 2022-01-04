@@ -373,7 +373,7 @@ class Refiner(GenericAgent):
 
 class Recycler(GenericAgent):
     """
-    Recycler and Postshredder agent.
+    Recycler agent that processes old parts and cars into recyclate plastic.
     """
 
     def __init__(self, unique_id, model, all_agents):
