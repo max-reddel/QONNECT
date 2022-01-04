@@ -187,7 +187,7 @@ class GenericAgent(Agent):
 
     def process_components(self):
         """
-        Process goods (manufactuging, shredding, using, or repairing).
+        Process goods (manufacturing, shredding, using, or repairing).
         """
         pass
 
@@ -295,7 +295,6 @@ class PartsManufacturer(GenericAgent):
     def process_components(self):
         """
         Manufacture parts out of plastic.
-
         Remark: Currrently, this is very simply implemented as it doesn't specify what plastic_ratio the parts have.
         """
 
@@ -385,14 +384,102 @@ class Recycler(GenericAgent):
         """
         super().__init__(unique_id, model, all_agents)
 
+        self.stock[Component.DISCARDED_PARTS] = [Part(state = PartState.REUSED) for _ in range(10)]
         self.stock[Component.RECYCLATE_LOW] = self.random.normalvariate(mu=10.0, sigma=2)
         self.stock[Component.RECYCLATE_HIGH] = self.random.normalvariate(mu=10.0, sigma=2)
+        brands = []
+        for brand in Brand:
+            brands.append(str(brand).rpartition('.')[2])
+        self.stock[Component.CARS_FOR_SHREDDER] = [Car(brand=self.random.choice(brands)) for _ in range(10)]
 
-        self.prices[Component.RECYCLATE_LOW] = self.random.normalvariate(mu=2.5, sigma=0.2)  # cost per unit
-        self.prices[Component.RECYCLATE_HIGH] = self.random.normalvariate(mu=2.5, sigma=0.2)  # cost per unit
+        self.prices[Component.RECYCLATE_LOW] = self.random.normalvariate(mu=2.5, sigma=0.2)  # cost per unit of recyclate
+        self.prices[Component.RECYCLATE_HIGH] = self.random.normalvariate(mu=3, sigma=0.2)  # cost per unit recyclate
 
-        # TODO: Need to define demand and default_demand (but for this, we need to define this agent's suppliers first)
+        # `efficiency` for recyclers control how many times `RECYCLATE_HIGH` can be recycled as 'RECYCLATE_HIGH'
+        self.efficiency = 0.50
 
+
+    def step(self):
+        """
+        Step method.
+        """
+
+    def process_components(self):
+        # return super().process_components()
+
+        # Shred discarded parts to extract plastic
+        # VIRGIN plastic present in the discarded parts is recycled as RECYCLATE_HIGH. 
+        # RECYCLATE_HIGH present in part is extracted and can be either used as RECYCLATE_HIGH or RECYCLATE_LOW depending upon efficiency of the Recycler.
+        # Similarly, The RECYCLATE_LOW can be either recycled as RECYCLATE_LOW or discareded depending upon efficiency of the Recycler.
+
+        while len(self.stock[Component.DISCARDED_PARTS]) > 0:
+            part = self.stock[Component.DISCARDED_PARTS][0]
+            plastic_ratio = Part.extract_plastic(part)
+            self.stock[Component.RECYCLATE_HIGH] += plastic_ratio[Component.VIRGIN]
+            if random.uniform(0,1 ) < self.efficiency:
+                self.stock[Component.RECYCLATE_HIGH] += plastic_ratio[Component.RECYCLATE_HIGH]
+                self.stock[Component.RECYCLATE_LOW] += plastic_ratio[Component.RECYCLATE_LOW]
+
+            else:
+                self.stock[Component.RECYCLATE_LOW] += plastic_ratio[Component.RECYCLATE_HIGH]
+            del self.stock[Component.DISCARDED_PARTS][0]
+
+
+        # Shred cars to extract plastic
+        while len(self.stock[Component.CARS_FOR_SHREDDER]) > 0:
+            # Extracting parts to get the plastic 
+            car = self.stock[Component.CARS_FOR_SHREDDER][0]
+            while len(car.parts) > 1:
+                part = car.parts[0]
+                plastic_ratio = Part.extract_plastic(part)
+                self.stock[Component.RECYCLATE_HIGH] += plastic_ratio[Component.VIRGIN]
+                if random.uniform(0,1 ) < self.efficiency:
+                    self.stock[Component.RECYCLATE_HIGH] += plastic_ratio[Component.RECYCLATE_HIGH]
+                    self.stock[Component.RECYCLATE_LOW] += plastic_ratio[Component.RECYCLATE_LOW]
+                else:
+                    self.stock[Component.RECYCLATE_LOW] += plastic_ratio[Component.RECYCLATE_HIGH]
+                del car.parts[0]
+            del self.stock[Component.CARS_FOR_SHREDDER][0]
+
+    def get_all_components(self):
+        """
+        Determine the order of suppliers by personal preference and then buy components.
+        """
+        # Suppliers for CARS_FOR_SHREDDER
+        self.garages = self.all_agents[Garage]
+        garages = self.get_sorted_suppliers(suppliers=self.garages, component=Component.CARS_FOR_SHREDDER)
+        self.get_component_from_suppliers(suppliers=garages, component=Component.CARS_FOR_SHREDDER)
+
+        # Suppliers for DISCARDED_PARTS
+        self.dismantlers = self.all_agents[Dismantler]
+        dismantlers = self.get_sorted_suppliers(suppliers=self.dismantlers, component=Component.DISCARDED_PARTS)
+        self.get_component_from_suppliers(suppliers=dismantlers, component=Component.DISCARDED_PARTS)
+    
+    def get_component_from_suppliers(self, suppliers, component):
+        """
+        Go through the suppliers and try to buy a specific component. Recycler buys all the available 'CARS_FOR_SHREDDER' and `DISCARDED_PARTS. 
+        :param suppliers: list of Agents
+        :param component: Component that this agent demands
+        """
+        while len(suppliers) > 0.0:
+            supplier = suppliers[0]
+            stock_of_supplier = supplier.get_stock()[component]
+            # Convert stock of supplier to int/float
+            if isinstance(stock_of_supplier, float) or isinstance(stock_of_supplier, int):
+                stock_of_supplier = stock_of_supplier
+            elif isinstance(stock_of_supplier, list):
+                stock_of_supplier = len(stock_of_supplier)
+            # Get the material from supplier
+            supplier.provide(recepient=self, component=component, amount=stock_of_supplier)
+            # Adjust remaining demand and supplier list
+            suppliers = suppliers[1:]
+    
+    def update(self):
+        """
+        Update prices for the next instant depending on the sales developed within the last two instants.
+        """
+        self.adjust_future_prices(component=Component.RECYCLATE_LOW)
+        self.adjust_future_prices(component=Component.RECYCLATE_HIGH)
 
 class CarManufacturer(GenericAgent):
     """
@@ -706,3 +793,71 @@ class Dismantler(GenericAgent):
          :param all_agents: dictionary with {Agent: list of Agents}
          """
         super().__init__(unique_id, model, all_agents)
+
+        self.stock[Component.PARTS] = [Part() for _ in range(100)]
+        self.stock[Component.DISCARDED_PARTS] = [Part(state=PartState.REUSED) for _ in range(100)]
+
+        # Randomly select a brand for cars in the stock
+        brands = []
+        for brand in Brand:
+            brands.append(str(brand).rpartition('.')[2])
+        self.stock[Component.CARS_FOR_DISMANTLER] = [Car(brand=self.random.choice(brands)) for _ in range(10)]
+
+        self.prices[Component.PARTS] = self.random.normalvariate(mu=2.5, sigma=0.2)  # cost per unit
+
+    def process_components(self):
+        """
+        Dismantle the car and adds the extracted parts to stock
+        """
+
+        # Sanity check
+        # if len(self.stock[Component.CARS_FOR_DISMANTLER]) < 1:
+        #     raise 'ValueError'
+
+        # Dismantles the car, reuses the STANDARD parts and adds them to the stock
+        while self.stock[Component.CARS_FOR_DISMANTLER]:
+            car = self.stock[Component.CARS_FOR_DISMANTLER][0]
+            while len(car.parts) > 1:
+                part = car.parts[0]
+                if part.state == PartState.STANDARD:
+                    # print('going into the enumeration')
+                    Part.reuse(part)
+                    self.stock[Component.PARTS].append(part)
+                else:
+                    # Reused parts are discarded and sent to the recyclers
+                    self.stock[Component.DISCARDED_PARTS].append(part)
+                del car.parts[0]
+            del self.stock[Component.CARS_FOR_DISMANTLER][0]
+
+    def get_all_components(self):
+        """
+        Determine the order of suppliers (Garages) by personal preference and then buy components.
+        """
+        self.garages = self.all_agents[Garage]
+        garages = self.get_sorted_suppliers(suppliers=self.garages, component=Component.CARS_FOR_DISMANTLER)
+        self.get_component_from_suppliers(suppliers=garages, component=Component.CARS_FOR_DISMANTLER)
+
+    def get_component_from_suppliers(self, suppliers, component):
+        """
+        Go through the suppliers and try to buy a specific component. Dismantler buys all the available 'CARS_FOR_DISMANTLER'. 
+        :param suppliers: list of Agents
+        :param component: Component that this agent demands
+        """
+        while len(suppliers) > 0.0:
+            supplier = suppliers[0]
+            stock_of_supplier = supplier.get_stock()[component]
+            # Convert stock of supplier to int/float
+            if isinstance(stock_of_supplier, float) or isinstance(stock_of_supplier, int):
+                stock_of_supplier = stock_of_supplier
+            elif isinstance(stock_of_supplier, list):
+                stock_of_supplier = len(stock_of_supplier)
+            # Get the material from supplier
+            supplier.provide(recepient=self, component=component, amount=stock_of_supplier)
+            # Adjust remaining demand and supplier list
+            suppliers = suppliers[1:]
+
+    def update(self):
+        """
+        Update prices for the next instant depending on the sales developed within the last two instants.
+        """
+        self.adjust_future_prices(component=Component.PARTS)

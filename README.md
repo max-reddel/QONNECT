@@ -56,19 +56,34 @@ Let's say for instance, a `PartsManufacturer` `pm1` is activated. This agent wan
 
 Earlier, we had `PlasticType` where we had `REUSE`, `VIRGIN`, `RECYCLATE_LOW`, and `RECYCLATE_HIGH`. However, we needed to restructure a bit as we also want to include parts and cars. For this purpose, we have now components (see section on [Cars and Parts](#44-the-composition-of-cars-and-parts)).
 
-### 2.3 Changes in Agents
-
-Agents have also received some adjustment treatment. `CarDesigner`s and `LogisticCompany`s have been kicked out completely (see section on [Agents](#41-agents)). The reasons for excluding the latter one lies in the fact that a `LogisticCompany` does not do much. It is only receiving `Part`s but not processing them at all. The idea is now to aggregate them away and have a direct connection between the `PartsManufacturer`s and the `Garage`s.
-
-### 2.4 Still to do
+### 2.3 Changes in Agents (Updated)
 
 1. Add more details to the following agents:
    - `Dismantler`
-   - `Garage`
+      - `process_components` method is implemented. It Dismantles the car, reuses the STANDARD parts and adds them to the stock. As per the current version, all every part is reused only once. All the reused parts are sent to the `Recycler`.
+
+         TODO/Suggestion: Add an `efficiency` factor for implementing multiple times REUSE of a part.
+
+      - `get_all_components` and  `get_component_from_suppliers` are updated. Now a `Dismantler` will accept all the cars from the `Garage`.
+
+         TODO: Create a flag if `stock[Component.CARS_FOR_DISMANTLER] == 0`. This can happen if somehow most `Garages` start sending all the cars to `Recyclers`. What should be done in this case? Think about implications?
+      - `update()` is implemented along with `adjust_future_prices`. 
+         TODO: Test `update()`
+
    - `Recycler`
-   - `User`
-2. Implement `process_components()` for all agents
-3. Implement `update_demand()` for all agents
+      - `process_components` method is implemented. This function extracts the plastic from both `CARS_FOR_SHREDDER` and `DISCARDED_PART`. `efficiency` of the `Recycler` determines how often can a plastic be recycled without degrading its quality. For instance, efficiency of recycler will control if RECYCLATE_HIGH will be recycled as RECYCLATE_HIGH RECYCLATE_LOW. VIRGIN plastic is always recycled as RECYCLATE_HIGH. RECYCLATE_HIGH present in the parts can be converted into RECYCLATE_LOW or RECYCLATE_HIGH depending on the `efficiency`. Similarly, RECYCLATE_LOW can either be discarded or again recycled as RECYCLATE_LOW.
+
+         TODO: Should we implement upcycling (i.e. RECYCLATE_LOW --> RECYCLATE_High)?
+
+         Also, `efficiency` can either be made constant or variable for each tick. What do you think is the best?
+      - `get_all_components` and  `get_component_from_suppliers` are updated. Now the `Recycler` will accept all the cars and discarded parts from the `Garage` and `Dismantler` respectively.
+
+      - `update()` is implemented along with `adjust_future_prices`. 
+         TODO: Test `update()`
+
+PS: All these implementations are tested and are running as expected. Please let me know if you find a bug or want me to change something.
+
+PSS: I found an additional bug which is quite similar to the problem Ryan faced. If its the same error then please ignore. In the `receive()` of `GenericAgent`, in the last line, the variable `supplies` is a list.  Therefore, `extend` or `+` should be used instead of `append`.
 
 ---
 ## 3. Repository Structure
@@ -105,8 +120,8 @@ Every single agent inherits its attributes and methods from `GenericAgent`. A li
 | `CarManufacturer`   | 4     | A facility that manufatures cars of a specific car brand with brand ϵ {VW, GM, Toyota, Mercedes}.             |
 | `PartsManufacturer` | 10    | A facility (= parts manufacturer or original equipment manufacturer) who takes plastic in and produces parts. |
 | `Refiner`           | 6    | A facility (= miners and refiners) that produces virgin plastic.                                               |
-| `Recycler`          | 4     | A facility (= shredder and post-shredder) that creates recyclate.                                             |
-| `Dismantler`        | 2     | A facility that dismantles cars.                                                                              |
+| `Recycler`          | 1     | A facility (= shredder and post-shredder) that creates recyclate.                                             |
+| `Dismantler`        | 1     | A facility that dismantles cars.                                                                              |
 | `Garage`            | 20    | A facility that repairs cars or sends them for final processing.                                              |
 <figcaption align = "center"><b>Tab.1 - Agents</b></figcaption>
 
@@ -117,6 +132,8 @@ Figure 1 shows the various agents in this network and how several kinds of compo
 
 ![image info](images/material_flow.png)
 <figcaption align = "center"><b>Fig.1 - Material flow between the agents</b></figcaption>
+
+      TODO: Update the figure: `DISCARDED_PARTS` are sent from Dismantler to Recycler. 
 
 ### 4.3 Components
 
@@ -131,6 +148,9 @@ Currenlty, everything works. But for `PARTS` and `CARS`, it's a simple way of ju
 | `RECYCLATE_HIGH` | float           | float            |
 | `PARTS`          | list            | int              |
 | `CARS`           | list            | int              |
+| `DISCARDED_PARTS`| list            | int              |
+| `CARS_FOR_DISMANTLER`| list        | int              |
+| `CARS_FOR_SHREDDER`| list          | int              |
 <figcaption align = "center"><b>Tab.2 - Components and their data types</b></figcaption>
 
 ### 4.4 The Composition of Cars and Parts

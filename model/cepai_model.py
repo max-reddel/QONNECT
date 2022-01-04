@@ -6,7 +6,6 @@ from mesa import Model
 from mesa.time import StagedActivation
 from model.agents import *
 
-
 class CEPAIModel(Model):
     """
     The model which concerns the circular economy of plastic in the automotive industry.
@@ -24,7 +23,7 @@ class CEPAIModel(Model):
             self.agent_counts = {
                 PartsManufacturer: 3,
                 Refiner: 3,
-                Recycler: 2,
+                Recycler: 1,
                 CarManufacturer: len(self.brands),
                 User: 10,
                 Garage: 2,
