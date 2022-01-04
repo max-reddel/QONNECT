@@ -239,7 +239,7 @@ class GenericAgent(Agent):
         noise = self.random.normalvariate(mu=1.0, sigma=0.2)
 
         if prev_year != 0 and prev_prev_year != 0:
-            self.prices[component] = self.prices[component] * prev_prev_year / prev_year * noise
+            self.prices[component] = self.prices[component] * prev_year / prev_prev_year * noise
         else:
             self.prices[component] = component.get_random_price()
 
@@ -247,14 +247,14 @@ class GenericAgent(Agent):
         """
         Adjust the demand of an agent's component for the next instant.
         :param component: Component
-        TODO: Doesn't work for agents that get two different components
+        TODO: Doesn't work for agents (only not PMs and CMs?) that get two different components
         """
         prev_year = self.sold_volume['last']
         prev_prev_year = self.sold_volume['second_last']
         noise = self.random.normalvariate(mu=1.0, sigma=0.2)
 
         if prev_year != 0 and prev_prev_year != 0:
-            self.demand[component] = self.demand[component] * prev_prev_year / prev_year * noise
+            self.demand[component] = self.demand[component] * prev_year / prev_prev_year * noise
             if component == Component.PARTS or component == Component.CARS:
                 self.demand[component] = round(self.demand[component])
         else:
@@ -419,6 +419,8 @@ class CarManufacturer(GenericAgent):
         self.demand[Component.CARS] = round(self.random.normalvariate(mu=10.0, sigma=2))  # aim to produce
         self.default_demand[Component.PARTS] = self.demand[Component.PARTS]
 
+        self.current_year_sales = 0
+
     def get_all_components(self):
         """
         Determine the order of suppliers by personal preference and then buy components.
@@ -458,10 +460,24 @@ class CarManufacturer(GenericAgent):
 
     def update(self):
         """
+        Update sold volumes.
         Update prices and demand for the next instant depending on the sales developed within the last two instants.
         """
+        self.sold_volume['second_last'] = self.sold_volume['last']
+        self.sold_volume['last'] = self.current_year_sales
+
         self.adjust_future_prices(component=Component.CARS)
         self.adjust_future_demand(component=Component.PARTS)
+
+        self.current_year_sales = 0
+
+    def register_sales(self, sales):
+        """
+        In the current conceptualisation, users buy cars themselves from car manufacturers which means this function is
+        called everytime this happens. The general register_sales function can therefore not be used for this purpose.
+        Instead, this function keeps track of their sales in another manner.
+        """
+        self.current_year_sales += sales
 
 
 class User(GenericAgent):
@@ -558,6 +574,12 @@ class User(GenericAgent):
         """
         self.possess_car()
 
+    def update(self):
+        """
+        Ensure a user always buys one car in case it does.
+        """
+        self.demand = self.default_demand
+
 
 class Garage(GenericAgent):
     """
@@ -586,6 +608,8 @@ class Garage(GenericAgent):
         self.demand[Component.PARTS] = round(self.random.normalvariate(mu=100.0, sigma=2))
         self.default_demand[Component.PARTS] = self.demand[Component.PARTS]
 
+        self.current_year_demand = 0
+
     def get_all_components(self):
         """
         Determine the order of suppliers by personal preference and then buy components.
@@ -608,6 +632,8 @@ class Garage(GenericAgent):
         if car.state == CarState.BROKEN:
             self.customer_base[car] = user
             user.car_repair = True
+
+            self.current_year_demand += 1
 
         elif car.state == CarState.END_OF_LIFE:
             self.stock[Component.CARS].remove(car)
@@ -652,6 +678,19 @@ class Garage(GenericAgent):
         confuse someone trying to read the code.
         """
         self.repair_and_return_cars()
+
+    def update(self):
+        """
+        Update yearly demand for parts, because garages can see actual demand for their parts.
+        Update prices and demand for the next instant depending on the sales developed within the last two instants.
+        """
+        self.sold_volume['second_last'] = self.sold_volume['last']
+        self.sold_volume['last'] = self.current_year_demand
+
+        self.adjust_future_prices(component=Component.PARTS)
+        self.adjust_future_demand(component=Component.PARTS)
+
+        self.current_year_demand = 0
 
 
 class Dismantler(GenericAgent):

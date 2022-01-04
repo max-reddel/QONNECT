@@ -26,7 +26,7 @@ class CEPAIModel(Model):
                 Refiner: 3,
                 Recycler: 2,
                 CarManufacturer: len(self.brands),
-                User: 2,
+                User: 10,
                 Garage: 2,
                 Dismantler: 1
             }
@@ -87,7 +87,8 @@ class CEPAIModel(Model):
                     new_agent = agent_type(self.next_id(), self, all_agents, self.get_next_brand())
                 elif agent_type is User:
                     """
-                    # TODO: may need to create a separate function for creating a user, because of use_intensity
+                    # TODO: may need to create a separate function for creating a user, because of use_intensity which
+                    can then also be used in the setup procedure.
                     """
                     new_agent = agent_type(self.next_id(), self, all_agents, self.get_car())
                 else:
