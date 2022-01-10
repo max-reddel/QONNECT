@@ -308,7 +308,6 @@ class PartsManufacturer(GenericAgent):
         """
 
         for _ in range(self.demand[Component.PARTS]):
-            #plastic_ratio = self.compute_plastic_ratio()
             new_part = Part(self.plastic_ratio)
             self.stock[Component.PARTS].append(new_part)
 
@@ -467,7 +466,7 @@ class Recycler(GenericAgent):
 
         while len(self.stock[Component.DISCARDED_PARTS]) > 0:
             part = self.stock[Component.DISCARDED_PARTS][0]
-            plastic_ratio = Part.extract_plastic(part)
+            plastic_ratio = part.extract_plastic()
             self.stock[Component.RECYCLATE_HIGH] += plastic_ratio[Component.VIRGIN]
             if random.uniform(0, 1) < self.efficiency:
                 self.stock[Component.RECYCLATE_HIGH] += plastic_ratio[Component.RECYCLATE_HIGH]
@@ -483,7 +482,7 @@ class Recycler(GenericAgent):
             car = self.stock[Component.CARS_FOR_SHREDDER][0]
             while len(car.parts) > 1:
                 part = car.parts[0]
-                plastic_ratio = Part.extract_plastic(part)
+                plastic_ratio = part.extract_plastic()
                 self.stock[Component.RECYCLATE_HIGH] += plastic_ratio[Component.VIRGIN]
                 if random.uniform(0, 1) < self.efficiency:
                     self.stock[Component.RECYCLATE_HIGH] += plastic_ratio[Component.RECYCLATE_HIGH]
@@ -545,7 +544,7 @@ class CarManufacturer(GenericAgent):
     CarManufacturer agent which transforms parts into cars.
     """
 
-    def __init__(self, unique_id, model, all_agents, brand, nr_of_parts=4):
+    def __init__(self, unique_id, model, all_agents, brand, nr_of_parts=4, break_down_probability=0.1):
         """
         :param unique_id: int
         :param model: CEPAIModel
@@ -555,6 +554,7 @@ class CarManufacturer(GenericAgent):
 
         self.brand = brand
         self.nr_of_parts = nr_of_parts
+        self.break_down_probability = break_down_probability
 
         self.stock[Component.PARTS] = [Part() for _ in range(100)]
         self.stock[Component.CARS] = [Car(self.brand) for _ in range(10)]
@@ -592,7 +592,7 @@ class CarManufacturer(GenericAgent):
             if not parts:
                 break
             else:
-                new_car = Car(brand=self.brand, parts=parts)
+                new_car = Car(brand=self.brand, parts=parts, break_down_probability=self.break_down_probability)
                 self.stock[Component.CARS].append(new_car)
 
     def get_next_parts(self, nr_of_parts):
@@ -652,14 +652,14 @@ class User(GenericAgent):
     """
     Car user agent. Can buy a car, use it, and can bring it to a garage for repairs or for discarding it.
     """
-    def __init__(self, unique_id, model, all_agents, car=None, use_intensity=1):
+    def __init__(self, unique_id, model, all_agents, car=None, std_use_intensity=0.1):
         """
          :param unique_id: int
          :param model: CEPAIModel
          :param all_agents: dictionary with {Agent: list of Agents}
          """
         super().__init__(unique_id, model, all_agents)
-        self.use_intensity = use_intensity
+        self.std_use_intensity = std_use_intensity
         self.car_repair = False
         self.garages = []
 
@@ -688,7 +688,7 @@ class User(GenericAgent):
 
             if self.stock[Component.CARS]:
                 car = self.stock[Component.CARS][0]
-                car.ELV = car.ELV * self.use_intensity
+                car.ELV = car.ELV * self.random.normalvariate(1, self.std_use_intensity)
 
     def bring_car_to_garage(self, car):
         """
@@ -728,8 +728,6 @@ class User(GenericAgent):
         """
         A user possesses a car. In case its car is not at the garage, the user will bring the car to the garage in case
         it is broken and continues using the car. If it is not broken, it will simply use the car.
-        NOTE: it is assumed a car is not for a whole year in the garage. Therefore, the car is still being used the year
-        when it is brought to the garage.
         At the moment this function is the equivalent of process_components.
         """
         if self.stock[Component.CARS]:

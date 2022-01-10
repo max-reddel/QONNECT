@@ -4,6 +4,7 @@ This module contains the plastic model which concerns the circular economy of pl
 
 from mesa import Model
 from mesa.time import StagedActivation
+from mesa.datacollection import DataCollector
 from model.agents import *
 
 
@@ -12,7 +13,7 @@ class CEPAIModel(Model):
     The model which concerns the circular economy of plastic in the automotive industry.
     """
 
-    def __init__(self, agent_counts=None, nr_of_parts=4):
+    def __init__(self, agent_counts=None, nr_of_parts=4, break_down_probability=0.3, std_use_intensity=0.1):
         """
         :param agent_counts: dictionary with {Agent: int}
         """
@@ -20,6 +21,8 @@ class CEPAIModel(Model):
         super().__init__()
         self.brands = {brand: False for brand in Brand}
         self.nr_of_parts = nr_of_parts
+        self.break_down_probability = break_down_probability
+        self.std_use_intensity = std_use_intensity
 
         if agent_counts is None:
             self.agent_counts = {
@@ -38,6 +41,8 @@ class CEPAIModel(Model):
         self.schedule = StagedActivation(self, stage_list=["get_all_components", "process_components", "update"])
 
         self.all_agents = self.create_all_agents()
+
+        self.datacollector = DataCollector(model_reporters={})
 
     def run(self, steps=50):
         """
@@ -58,11 +63,11 @@ class CEPAIModel(Model):
         """
         To setup users with cars initially. If the lifetime of the assigned car is zero, it means that the user will
         buy a new car in the first tick. Else its car is assigned a random brand, state, current lifetime and parts.
-        # TODO: integrate nr_of_parts as a model input variable? Because this is also used when running the model for creating cars.
         """
         brand = self.random.choice(list(Brand))
         lifetime_current = random.randint(0, lifetime_vehicle)
-        parts = self.random.choices(list(PartState), weights=(1, 9), k=self.nr_of_parts)
+        part_states = self.random.choices(list(PartState), weights=(1, 9), k=self.nr_of_parts)
+        parts = [Part(state=state) for state in part_states]
 
         if lifetime_current == 0:
             car = None
@@ -70,10 +75,29 @@ class CEPAIModel(Model):
             if lifetime_current == lifetime_vehicle:
                 state = CarState.FUNCTIONING
             else:
-                state = self.random.choices(list(CarState)[:2], weights=[1, 9])
+                state = self.random.choices(list(CarState)[:2], weights=[self.break_down_probability,
+                                                                         1 - self.break_down_probability])[0]
 
             car = Car(brand=brand, lifetime_current=lifetime_current, state=state, parts=parts)
         return car
+
+    def create_user(self, agent_type, all_agents):
+        """
+        To set up users and assign them cars of which the ELV is based on the intensity of the usage of cars.
+        """
+        new_agent = agent_type(self.next_id(), self, all_agents, self.get_car(), self.std_use_intensity)
+        if new_agent.stock[Component.CARS]:
+            car = new_agent.stock[Component.CARS][0]
+            use_intensity = random.normalvariate(1, self.std_use_intensity)
+            use_intensity = max(0.0, use_intensity)
+
+            if use_intensity > 0:
+                car.ELV = round(car.ELV / use_intensity)
+
+                if car.ELV < car.lifetime_current:
+                    car.lifetime_current = car.ELV
+
+        return new_agent
 
     def create_all_agents(self):
         """
@@ -85,13 +109,11 @@ class CEPAIModel(Model):
         for agent_type, agent_count in self.agent_counts.items():
             for _ in range(agent_count):
                 if agent_type is CarManufacturer:
-                    new_agent = agent_type(self.next_id(), self, all_agents, self.get_next_brand(), self.nr_of_parts)
+                    new_agent = agent_type(self.next_id(), self, all_agents, self.get_next_brand(), self.nr_of_parts,
+                                           self.break_down_probability)
                 elif agent_type is User:
-                    """
-                    # TODO: may need to create a separate function for creating a user, because of use_intensity which
-                    can then also be used in the setup procedure.
-                    """
-                    new_agent = agent_type(self.next_id(), self, all_agents, self.get_car())
+                    new_agent = self.create_user(agent_type, all_agents)
+
                 else:
                     """
                     With the current model, in which garages receive cars and repair them in the same tick, I didn't
