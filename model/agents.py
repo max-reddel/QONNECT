@@ -301,7 +301,6 @@ class PartsManufacturer(GenericAgent):
         """
 
         for _ in range(self.demand[Component.PARTS]):
-            #plastic_ratio = self.compute_plastic_ratio()
             new_part = Part(self.plastic_ratio)
             self.stock[Component.PARTS].append(new_part)
 
@@ -417,7 +416,7 @@ class Recycler(GenericAgent):
         """
         super().__init__(unique_id, model, all_agents)
 
-        self.stock[Component.DISCARDED_PARTS] = [Part(state = PartState.REUSED) for _ in range(10)]
+        self.stock[Component.DISCARDED_PARTS] = [Part(state=PartState.REUSED) for _ in range(10)]
         self.stock[Component.RECYCLATE_LOW] = self.random.normalvariate(mu=10.0, sigma=2)
         self.stock[Component.RECYCLATE_HIGH] = self.random.normalvariate(mu=10.0, sigma=2)
         brands = []
