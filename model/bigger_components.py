@@ -10,7 +10,7 @@ import random
 
 class Part:
     """
-    A part conists of three different kinds of plastic.
+    A part consists of three different kinds of plastic.
     """
 
     def __init__(self, plastic_ratio=None, state=PartState.STANDARD):

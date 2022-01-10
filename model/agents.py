@@ -292,6 +292,8 @@ class PartsManufacturer(GenericAgent):
             Component.RECYCLATE_LOW: 0.2,
             Component.RECYCLATE_HIGH: 0.2}
 
+        self.plastic_ratio = self.compute_plastic_ratio()
+
     def process_components(self):
         """
         Manufacture parts out of plastic.
@@ -299,14 +301,18 @@ class PartsManufacturer(GenericAgent):
         """
 
         for _ in range(self.demand[Component.PARTS]):
-            plastic_ratio = self.compute_plastic_ratio()
-            new_part = Part(plastic_ratio)
+            #plastic_ratio = self.compute_plastic_ratio()
+            new_part = Part(self.plastic_ratio)
             self.stock[Component.PARTS].append(new_part)
 
     def compute_plastic_ratio(self):
         """
         Compute the ratio of plastic that is needed to create parts
         :return:
+        # TODO: We dealt with max function with virgin plastics, but what about the recycled materials?
+        Let's say recyclate low has a minimum requirement of 20% and high of 80%, by then randomising it we end up
+        with more than one again. Maybe create an if statement to check whether the sum of recycled materials is bigger
+        than one and if so, scale them to one again.
         """
 
         plastic_ratio = {
@@ -316,6 +322,14 @@ class PartsManufacturer(GenericAgent):
             Component.RECYCLATE_HIGH: self.random.uniform(self.minimum_requirements[Component.RECYCLATE_HIGH],
                                                           self.minimum_requirements[Component.RECYCLATE_HIGH] * 1.25)
         }
+
+        ratio_recyclables = plastic_ratio[Component.RECYCLATE_LOW] + plastic_ratio[Component.RECYCLATE_HIGH]
+        if ratio_recyclables > 1:
+            plastic_ratio = {
+                Component.VIRGIN: 0,
+                Component.RECYCLATE_LOW: plastic_ratio[Component.RECYCLATE_LOW]/ratio_recyclables,
+                Component.RECYCLATE_HIGH: plastic_ratio[Component.RECYCLATE_HIGH]/ratio_recyclables
+            }
 
         # Adjust virgin plastic weight such that the sum of all plastic will be 1.0
         plastic_ratio[Component.VIRGIN] = max(0.0, 1.0 - sum(plastic_ratio.values()))
@@ -344,9 +358,28 @@ class PartsManufacturer(GenericAgent):
         Update prices and demand for the next instant depending on the sales developed within the last two instants.
         """
         self.adjust_future_prices(component=Component.PARTS)
-        self.adjust_future_demand(component=Component.VIRGIN)
-        self.adjust_future_demand(component=Component.RECYCLATE_LOW)
-        self.adjust_future_demand(component=Component.RECYCLATE_HIGH)
+        self.adjust_future_demand(component=Component.PARTS)
+
+    def adjust_future_demand(self, component):
+        """
+        Parts manufacturers adjust demand differently than other agents, because they supply different components than
+        they receive. They update their demand for parts and accordingly to their plastic ratios, update their demand
+        for raw materials.
+        """
+        prev_year = self.sold_volume['last']
+        prev_prev_year = self.sold_volume['second_last']
+        noise = self.random.normalvariate(mu=1.0, sigma=0.2)
+
+        if prev_year != 0 and prev_prev_year != 0:
+            self.demand[component] = self.demand[component] * prev_year / prev_prev_year * noise
+            self.demand[component] = round(self.demand[component])
+        else:
+            self.demand[component] = self.default_demand[component]
+
+        self.plastic_ratio = self.compute_plastic_ratio()
+
+        for plastic_type, ratio in self.plastic_ratio.items():
+            self.demand[plastic_type] = ratio * self.demand[Component.PARTS]
 
 
 class Refiner(GenericAgent):
@@ -481,12 +514,13 @@ class Recycler(GenericAgent):
         self.adjust_future_prices(component=Component.RECYCLATE_LOW)
         self.adjust_future_prices(component=Component.RECYCLATE_HIGH)
 
+
 class CarManufacturer(GenericAgent):
     """
     CarManufcaturer agent which transforms parts into cars.
     """
 
-    def __init__(self, unique_id, model, all_agents, brand):
+    def __init__(self, unique_id, model, all_agents, brand, nr_of_parts=4):
         """
         :param unique_id: int
         :param model: CEPAIModel
@@ -495,6 +529,7 @@ class CarManufacturer(GenericAgent):
         super().__init__(unique_id, model, all_agents)
 
         self.brand = brand
+        self.nr_of_parts = nr_of_parts
 
         self.stock[Component.PARTS] = [Part() for _ in range(100)]
         self.stock[Component.CARS] = [Car(self.brand) for _ in range(10)]
@@ -522,14 +557,14 @@ class CarManufacturer(GenericAgent):
         Manufacture specific amount of cars.
         """
         for _ in range(self.demand[Component.CARS]):
-            parts = self.get_next_parts(nr_of_parts=4)
+            parts = self.get_next_parts(nr_of_parts=self.nr_of_parts)
             if not parts:
                 break
             else:
                 new_car = Car(brand=self.brand, parts=parts)
                 self.stock[Component.CARS].append(new_car)
 
-    def get_next_parts(self, nr_of_parts=4):
+    def get_next_parts(self, nr_of_parts):
         """
         Get the next four parts from stock and return them to create a car with them.
         :param nr_of_parts: int: indicates how many parts a car needs to be fully assembled
@@ -539,7 +574,7 @@ class CarManufacturer(GenericAgent):
         all_parts = self.stock[Component.PARTS]
 
         if len(all_parts) >= nr_of_parts:
-            next_parts = all_parts[:4]
+            next_parts = all_parts[:nr_of_parts]
         else:
             next_parts = []
 
@@ -566,12 +601,26 @@ class CarManufacturer(GenericAgent):
         """
         self.current_year_sales += sales
 
+    def adjust_future_demand(self, component):
+        """
+        Car manufacturers adjust demand differently than other agents, because they supply different components than
+        they receive.
+        """
+        prev_year = self.sold_volume['last'] * self.nr_of_parts
+        prev_prev_year = self.sold_volume['second_last'] * self.nr_of_parts
+        noise = self.random.normalvariate(mu=1.0, sigma=0.2)
+
+        if prev_year != 0 and prev_prev_year != 0:
+            self.demand[component] = self.demand[component] * prev_year / prev_prev_year * noise
+            self.demand[component] = round(self.demand[component])
+        else:
+            self.demand[component] = self.default_demand[component]
+
 
 class User(GenericAgent):
     """
     Car user agent. Can buy a car, use it, and can bring it to a garage for repairs or for discarding it.
     """
-
     def __init__(self, unique_id, model, all_agents, car=None, use_intensity=1):
         """
          :param unique_id: int

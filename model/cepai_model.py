@@ -6,18 +6,20 @@ from mesa import Model
 from mesa.time import StagedActivation
 from model.agents import *
 
+
 class CEPAIModel(Model):
     """
     The model which concerns the circular economy of plastic in the automotive industry.
     """
 
-    def __init__(self, agent_counts=None):
+    def __init__(self, agent_counts=None, nr_of_parts=4):
         """
         :param agent_counts: dictionary with {Agent: int}
         """
         print('Simulation starting...')
         super().__init__()
         self.brands = {brand: False for brand in Brand}
+        self.nr_of_parts = nr_of_parts
 
         if agent_counts is None:
             self.agent_counts = {
@@ -60,7 +62,7 @@ class CEPAIModel(Model):
         """
         brand = self.random.choice(list(Brand))
         lifetime_current = random.randint(0, lifetime_vehicle)
-        parts = self.random.choices(list(PartState), weights=(1, 9), k=4)
+        parts = self.random.choices(list(PartState), weights=(1, 9), k=self.nr_of_parts)
 
         if lifetime_current == 0:
             car = None
@@ -83,7 +85,7 @@ class CEPAIModel(Model):
         for agent_type, agent_count in self.agent_counts.items():
             for _ in range(agent_count):
                 if agent_type is CarManufacturer:
-                    new_agent = agent_type(self.next_id(), self, all_agents, self.get_next_brand())
+                    new_agent = agent_type(self.next_id(), self, all_agents, self.get_next_brand(), self.nr_of_parts)
                 elif agent_type is User:
                     """
                     # TODO: may need to create a separate function for creating a user, because of use_intensity which
