@@ -6,6 +6,7 @@ from mesa import Model
 from mesa.time import StagedActivation
 from mesa.datacollection import DataCollector
 from model.agents import *
+import time
 
 
 class CEPAIModel(Model):
@@ -13,11 +14,19 @@ class CEPAIModel(Model):
     The model which concerns the circular economy of plastic in the automotive industry.
     """
 
-    def __init__(self, agent_counts=None, nr_of_parts=4, break_down_probability=0.3, std_use_intensity=0.1):
+    def __init__(self,
+                 agent_counts=None,
+                 nr_of_parts=4,
+                 break_down_probability=0.3,
+                 std_use_intensity=0.1):
         """
+        :param nr_of_parts: int: how many parts are needed to create a Car object
+        :param break_down_probability: float: probability of a car breaking down at any given year
+        :param std_use_intensity: float: standard deviation of how intensely a user uses a car
         :param agent_counts: dictionary with {Agent: int}
         """
         print('Simulation starting...')
+
         super().__init__()
         self.brands = {brand: False for brand in Brand}
         self.nr_of_parts = nr_of_parts
@@ -39,18 +48,24 @@ class CEPAIModel(Model):
             self.agent_counts[CarManufacturer] = len(self.brands)
 
         self.schedule = StagedActivation(self, stage_list=["get_all_components", "process_components", "update"])
-
         self.all_agents = self.create_all_agents()
-
         self.datacollector = DataCollector(model_reporters={})
 
-    def run(self, steps=50):
+    def run(self, steps=50, time_tracking=False):
         """
         Runs the model for a specific amount of steps.
         :param steps: int: number of steps (in years)
         """
+
+        start_time = time.time()
+
         for _ in range(steps):
             self.step()
+
+        if time_tracking:
+            run_time = round(time.time() - start_time, 2)
+            print(f'Run time: {run_time} seconds')
+
         print('Simulation completed!')
 
     def get_next_brand(self):
@@ -63,6 +78,8 @@ class CEPAIModel(Model):
         """
         To setup users with cars initially. If the lifetime of the assigned car is zero, it means that the user will
         buy a new car in the first tick. Else its car is assigned a random brand, state, current lifetime and parts.
+        :param lifetime_vehicle: int
+        :return: car: Car
         """
         brand = self.random.choice(list(Brand))
         lifetime_current = random.randint(0, lifetime_vehicle)
@@ -84,6 +101,9 @@ class CEPAIModel(Model):
     def create_user(self, agent_type, all_agents):
         """
         To set up users and assign them cars of which the ELV is based on the intensity of the usage of cars.
+        :param agent_type: Agent
+        :param all_agents: dictionary with {Agent: list with this kind of Agents}
+        :return: new_agent: Agent
         """
         new_agent = agent_type(self.next_id(), self, all_agents, self.get_car(), self.std_use_intensity)
         if new_agent.stock[Component.CARS]:
