@@ -464,7 +464,7 @@ class Recycler(GenericAgent):
         # RECYCLATE_HIGH present in part is extracted and can be either used as RECYCLATE_HIGH or RECYCLATE_LOW depending upon efficiency of the Recycler.
         # Similarly, The RECYCLATE_LOW can be either recycled as RECYCLATE_LOW or discarded depending upon efficiency of the Recycler.
 
-        while len(self.stock[Component.DISCARDED_PARTS]) > 0:
+        while self.stock[Component.DISCARDED_PARTS]:
             part = self.stock[Component.DISCARDED_PARTS][0]
             plastic_ratio = part.extract_plastic()
             self.stock[Component.RECYCLATE_HIGH] += plastic_ratio[Component.VIRGIN]
@@ -477,10 +477,10 @@ class Recycler(GenericAgent):
             del self.stock[Component.DISCARDED_PARTS][0]
 
         # Shred cars to extract plastic
-        while len(self.stock[Component.CARS_FOR_SHREDDER]) > 0:
+        while self.stock[Component.CARS_FOR_SHREDDER]:
             # Extracting parts to get the plastic
             car = self.stock[Component.CARS_FOR_SHREDDER][0]
-            while len(car.parts) > 1:
+            while car.parts:
                 part = car.parts[0]
                 plastic_ratio = part.extract_plastic()
                 self.stock[Component.RECYCLATE_HIGH] += plastic_ratio[Component.VIRGIN]
@@ -516,7 +516,7 @@ class Recycler(GenericAgent):
         :param suppliers: list of Agents
         :param component: Component that this agent demands
         """
-        while len(suppliers) > 0.0:
+        while suppliers:
             supplier = suppliers[0]
             stock_of_supplier = supplier.get_stock()[component]
             # Convert stock of supplier to int/float
@@ -909,7 +909,7 @@ class Dismantler(GenericAgent):
         # Dismantles the car, reuses the STANDARD parts and adds them to the stock
         while self.stock[Component.CARS_FOR_DISMANTLER]:
             car = self.stock[Component.CARS_FOR_DISMANTLER][0]
-            while len(car.parts) > 1:
+            while car.parts:
                 part = car.parts[0]
                 if part.state == PartState.STANDARD:
                     # print('going into the enumeration')
@@ -937,7 +937,7 @@ class Dismantler(GenericAgent):
         :param suppliers: list of Agents
         :param component: Component that this agent demands
         """
-        while len(suppliers) > 0.0:
+        while suppliers:
             supplier = suppliers[0]
             stock_of_supplier = supplier.get_stock()[component]
             # Convert stock of supplier to int/float
