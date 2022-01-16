@@ -13,28 +13,40 @@ class Part:
     A part consists of three different kinds of plastic.
     """
 
-    def __init__(self, plastic_ratio=None, state=PartState.STANDARD):
+    def __init__(self,
+                 plastic_ratio=None,
+                 state=PartState.STANDARD):
+        """
+        :param plastic_ratio: dictionary {Component: float}
+        :param state: PartState
+        """
 
         self.minimum_requirements = {
             Component.RECYCLATE_LOW: 0.2,
             Component.RECYCLATE_HIGH: 0.2}
 
         if plastic_ratio is None:
-            self.plastic_ratio = {
-                Component.VIRGIN: 0,
-                Component.RECYCLATE_LOW: random.uniform(
-                    self.minimum_requirements[Component.RECYCLATE_LOW],
-                    self.minimum_requirements[Component.RECYCLATE_LOW] * 1.25),
-                Component.RECYCLATE_HIGH: random.uniform(
-                    self.minimum_requirements[Component.RECYCLATE_HIGH],
-                    self.minimum_requirements[Component.RECYCLATE_HIGH] * 1.25)
-            }
-            # Adjust virgin plastic weight such that the sum of all plastic will be 1.0
-            self.plastic_ratio[Component.VIRGIN] = 1.0 - sum(self.plastic_ratio.values())
+            self.init_plastic_ratio()
         else:
             self.plastic_ratio = plastic_ratio
 
         self.state = state
+
+    def init_plastic_ratio(self):
+        """
+        Initialize plastic ratio according to minimum_requirements.
+        """
+        self.plastic_ratio = {
+            Component.RECYCLATE_LOW: random.uniform(
+                self.minimum_requirements[Component.RECYCLATE_LOW],
+                self.minimum_requirements[Component.RECYCLATE_LOW] * 1.25),
+            Component.RECYCLATE_HIGH: random.uniform(
+                self.minimum_requirements[Component.RECYCLATE_HIGH],
+                self.minimum_requirements[Component.RECYCLATE_HIGH] * 1.25),
+            Component.VIRGIN: 0
+        }
+        # Adjust virgin plastic weight such that the sum of all plastic will be 1.0
+        self.plastic_ratio[Component.VIRGIN] = 1.0 - sum(self.plastic_ratio.values())
 
     def reuse(self):
         """
@@ -60,16 +72,34 @@ class Car:
     The Car class.
     """
 
-    def __init__(self, brand, lifetime_current=0, state=CarState.FUNCTIONING,
-                 parts=None, nr_of_parts=4, break_down_probability=0.1):
+    def __init__(self,
+                 brand=None,
+                 lifetime_current=0,
+                 state=CarState.FUNCTIONING,
+                 parts=None,
+                 nr_of_parts=4,
+                 break_down_probability=0.1):
+        """
+        TODO: Fill
+        :param brand: Brand
+        :param lifetime_current:
+        :param state:
+        :param parts:
+        :param nr_of_parts:
+        :param break_down_probability:
+        """
+
         # Apply parameters, if none specified then it will be a new car. Otherwise, randomly old car.
         if parts is None:
             parts = [Part() for _ in range(nr_of_parts)]
 
         self.lifetime_current = lifetime_current
-        self.ELV = 10
+        self.max_lifetime = 10
         self.state = state
-        self.brand = brand
+        if brand is None:
+            self.brand = Brand.get_random()
+        else:
+            self.brand = brand
         self.parts = parts
         self.break_down_probability = break_down_probability
 
@@ -80,13 +110,8 @@ class Car:
         """
 
         if part.state == PartState.REUSED:
-            part_index = random.randint(0, len(self.parts)-1)
-
-            for i in range(part_index):
-                self.parts[i] = self.parts[i+1]
-
-            self.parts[part_index] = part
-
+            idx = random.randint(0, len(self.parts) - 1)
+            self.parts.insert(idx, part)
         else:
             self.parts = self.parts[1:]
             self.parts.append(part)
@@ -104,12 +129,16 @@ class Car:
         """
         A car can break down when it is functioning. It may also have reached its end of life.
         """
-        if self.lifetime_current >= self.ELV:
+        if self.lifetime_current >= self.max_lifetime:
             self.state = CarState.END_OF_LIFE
 
         elif random.random() < self.break_down_probability and self.state == CarState.FUNCTIONING:
             self.state = CarState.BROKEN
 
     def use_car(self):  # User calls this function.
+        """
+        TODO: Fill
+        :return:
+        """
         self.to_break_down()
         self.increment_lifetime()

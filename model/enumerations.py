@@ -1,5 +1,5 @@
 from enum import Enum
-from random import normalvariate
+from random import normalvariate, choice
 
 
 class Component(Enum):
@@ -10,9 +10,9 @@ class Component(Enum):
     RECYCLATE_LOW = 2
     RECYCLATE_HIGH = 3
     PARTS = 4
-    DISCARDED_PARTS = 5
+    PARTS_FOR_RECYCLER = 5
     CARS = 6
-    CARS_FOR_SHREDDER = 7
+    CARS_FOR_RECYCLER = 7
     CARS_FOR_DISMANTLER = 8
 
     def get_random_price(self):
@@ -58,3 +58,13 @@ class Brand(Enum):
     GM = 1
     TOYOTA = 2
     MERCEDES = 3
+
+    @staticmethod
+    def get_random():
+        """
+        Returns a random brand.
+        :return: brand: Brand
+        """
+        brands = [brand for brand in Brand]
+        brand = choice(brands)
+        return brand

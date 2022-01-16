@@ -20,10 +20,10 @@ class CEPAIModel(Model):
                  break_down_probability=0.3,
                  std_use_intensity=0.1):
         """
+        :param agent_counts: dictionary with {Agent: int}
         :param nr_of_parts: int: how many parts are needed to create a Car object
         :param break_down_probability: float: probability of a car breaking down at any given year
-        :param std_use_intensity: float: standard deviation of how intensely a user uses a car
-        :param agent_counts: dictionary with {Agent: int}
+        :param std_use_intensity: float: standard value of how intensely a user uses a car
         """
         print('Simulation starting...')
 
@@ -39,7 +39,7 @@ class CEPAIModel(Model):
                 Refiner: 3,
                 Recycler: 1,
                 CarManufacturer: len(self.brands),
-                User: 10,
+                User: 1000,
                 Garage: 2,
                 Dismantler: 1
             }
@@ -55,6 +55,7 @@ class CEPAIModel(Model):
         """
         Runs the model for a specific amount of steps.
         :param steps: int: number of steps (in years)
+        :param time_tracking: Boolean
         """
 
         start_time = time.time()
@@ -98,27 +99,6 @@ class CEPAIModel(Model):
             car = Car(brand=brand, lifetime_current=lifetime_current, state=state, parts=parts)
         return car
 
-    def create_user(self, agent_type, all_agents):
-        """
-        To set up users and assign them cars of which the ELV is based on the intensity of the usage of cars.
-        :param agent_type: Agent
-        :param all_agents: dictionary with {Agent: list with this kind of Agents}
-        :return: new_agent: Agent
-        """
-        new_agent = agent_type(self.next_id(), self, all_agents, self.get_car(), self.std_use_intensity)
-        if new_agent.stock[Component.CARS]:
-            car = new_agent.stock[Component.CARS][0]
-            use_intensity = random.normalvariate(1, self.std_use_intensity)
-            use_intensity = max(0.0, use_intensity)
-
-            if use_intensity > 0:
-                car.ELV = round(car.ELV / use_intensity)
-
-                if car.ELV < car.lifetime_current:
-                    car.lifetime_current = car.ELV
-
-        return new_agent
-
     def create_all_agents(self):
         """
         Create all agents for this model.
@@ -132,8 +112,7 @@ class CEPAIModel(Model):
                     new_agent = agent_type(self.next_id(), self, all_agents, self.get_next_brand(), self.nr_of_parts,
                                            self.break_down_probability)
                 elif agent_type is User:
-                    new_agent = self.create_user(agent_type, all_agents)
-
+                    new_agent = self.create_user(all_agents)
                 else:
                     """
                     With the current model, in which garages receive cars and repair them in the same tick, I didn't
@@ -150,8 +129,29 @@ class CEPAIModel(Model):
                     all_agents[agent_type] = [new_agent]
         return all_agents
 
+    def create_user(self, all_agents):
+        """
+        To set up users and assign them cars of which the max_lifetime is based on the intensity of the usage of cars.
+        :param all_agents: dictionary with {Agent: list with this kind of Agents}
+        :return: new_agent: Agent
+        """
+        new_agent = User(self.next_id(), self, all_agents, self.get_car(), self.std_use_intensity)
+        if new_agent.stock[Component.CARS]:
+            car = new_agent.stock[Component.CARS][0]
+            use_intensity = random.normalvariate(1, self.std_use_intensity)
+            use_intensity = max(0.0, use_intensity)
+
+            if use_intensity > 0.0:
+                car.max_lifetime = round(car.max_lifetime / use_intensity)  # NOTE: Check whether resulting max_lifetime values make sense
+
+                if car.max_lifetime <= car.lifetime_current:
+                    car.lifetime_current = car.max_lifetime
+
+        return new_agent
+
     def step(self):
         """
         Executes a model step.
         """
+        self.datacollector.collect(self)
         self.schedule.step()
