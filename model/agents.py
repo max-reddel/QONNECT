@@ -416,7 +416,7 @@ class Recycler(GenericAgent):
         """
         super().__init__(unique_id, model, all_agents)
 
-        self.stock[Component.PARTS_FOR_RECYCLER] = [Part(state=PartState.REUSED) for _ in range(10)]  # NOTE: Why?
+        self.stock[Component.PARTS_FOR_RECYCLER] = [Part(state=PartState.REUSED) for _ in range(10)]
         self.stock[Component.RECYCLATE_LOW] = self.random.normalvariate(mu=10.0, sigma=2)
         self.stock[Component.RECYCLATE_HIGH] = self.random.normalvariate(mu=10.0, sigma=2)
         self.stock[Component.CARS_FOR_RECYCLER] = [Car() for _ in range(10)]
