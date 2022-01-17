@@ -249,7 +249,6 @@ class GenericAgent(Agent):
         """
         Adjust the demand of an agent's component for the next instant.
         :param component: Component
-        TODO: Doesn't work for agents (only not PMs and CMs?) that get two different components
         """
         prev_year = self.sold_volume['last']
         prev_prev_year = self.sold_volume['second_last']
@@ -774,7 +773,6 @@ class Garage(GenericAgent):
         confuse someone trying to read the code.
         """
         self.repair_and_return_cars()
-        # TODO: Also take care of ELVs
 
     def update(self):
         """
