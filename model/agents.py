@@ -601,7 +601,6 @@ class User(GenericAgent):
          """
         super().__init__(unique_id, model, all_agents)
         self.std_use_intensity = std_use_intensity
-        self.car_repair = False
         self.garages = []
 
         if car is None:
@@ -609,8 +608,7 @@ class User(GenericAgent):
         else:
             self.stock[Component.CARS] = [car]
 
-        self.demand[Component.CARS] = 1  # TODO: Never used
-        self.default_demand[Component.CARS] = self.demand[Component.CARS]
+        self.demand[Component.CARS] = 1
 
     def get_all_components(self):
         """
@@ -620,11 +618,12 @@ class User(GenericAgent):
         When the user has bought the car, the max_lifetime of the car is corrected by the intensity of use of the car.
         """
 
-        if not self.stock[Component.CARS] and not self.car_repair:  # TODO: Use demand here
+        if self.demand[Component.CARS] == 1:
             # Buy new car
             car_manufacturers = self.all_agents[CarManufacturer]
             car_manufacturers = self.get_sorted_suppliers(suppliers=car_manufacturers, component=Component.CARS)
             self.get_component_from_suppliers(suppliers=car_manufacturers, component=Component.CARS)
+            self.demand[Component.CARS] = 0
 
             # Adjust lifetime of car
             if self.stock[Component.CARS]:
@@ -677,11 +676,9 @@ class User(GenericAgent):
 
     def update(self):
         """
-        Ensure a user always buys one car in case it does.
+        Demand is updated for the user when buying a car and bringing its ELV to the garage.
         """
-        self.demand = self.default_demand
-        # TODO: @Ryan, overwriting update() is not needed, right?
-        #  Because every user will always want just 1 car. And the demand is currently anyway nowhere used, right?
+        pass
 
 
 class Garage(GenericAgent):
@@ -736,11 +733,10 @@ class Garage(GenericAgent):
 
         if car.state == CarState.BROKEN:
             self.customer_base[car] = user
-            user.car_repair = True
-
             self.current_year_demand += 1
 
         elif car.state == CarState.END_OF_LIFE:
+            user.demand[Component.CARS] = 1
             self.stock[Component.CARS].remove(car)
             if self.random.random() < self.circularity_friendliness:
                 self.stock[Component.CARS_FOR_DISMANTLER].append(car)

@@ -137,6 +137,7 @@ class CEPAIModel(Model):
         """
         new_agent = User(self.next_id(), self, all_agents, self.get_car(), self.std_use_intensity)
         if new_agent.stock[Component.CARS]:
+            new_agent.demand[Component.CARS] = 0
             car = new_agent.stock[Component.CARS][0]
             use_intensity = random.normalvariate(1, self.std_use_intensity)
             use_intensity = max(0.0, use_intensity)
