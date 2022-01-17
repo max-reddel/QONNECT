@@ -675,8 +675,6 @@ class User(GenericAgent):
             self.bring_car_to_garage(car)
             car.use_car()
 
-        # TODO: @Ryan, maybe something here also regarding when the car has reached its end of life?
-
     def update(self):
         """
         Ensure a user always buys one car in case it does.
@@ -727,13 +725,14 @@ class Garage(GenericAgent):
         Receive a car from User. Should be initiated by User in case car is broken, it can choose which garage to go to.
         We keep track of which user a car belongs to in the customer base.
         If the car is at the end of its life, the garage decides whether the car goes to the shredder or dismantler.
+        :param user: User
+        :param car: Car
         """
         component = Component.CARS
         # To make functions work for receiving cars.
         self.demand[component] = 1
 
-        self.get_component_from_suppliers(
-            suppliers=[user], component=component)
+        self.get_component_from_suppliers(suppliers=[user], component=component)
 
         if car.state == CarState.BROKEN:
             self.customer_base[car] = user
