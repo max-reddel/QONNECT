@@ -693,7 +693,10 @@ class Garage(GenericAgent):
         """
         super().__init__(unique_id, model, all_agents)
 
-        # TODO: Add comment to explain self.customer_base
+        """
+        To keep track of which user a car belongs to, a garage has a dictionary with a certain car in their possession 
+        as key and the corresponding user as value. This ensures giving cars back to the rightful owner.
+        """
         self.customer_base = {}
         self.circularity_friendliness = circularity_friendliness
 
