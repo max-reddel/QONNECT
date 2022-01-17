@@ -471,11 +471,9 @@ class Recycler(GenericAgent):
         self.get_component_from_suppliers(suppliers=garages, component=Component.CARS_FOR_RECYCLER)
 
         # Suppliers for PARTS_FOR_RECYCLER
-        dismantler = self.all_agents[Dismantler]
-        dismantler = self.get_sorted_suppliers(suppliers=dismantler, component=Component.PARTS_FOR_RECYCLER)
-        self.get_component_from_suppliers(suppliers=dismantler, component=Component.PARTS_FOR_RECYCLER)
-
-        # TODO: Discarded parts should also come from garages @Anmol
+        parts_suppliers = self.all_agents[Garage] + self.all_agents[Dismantler]
+        parts_suppliers = self.get_sorted_suppliers(suppliers=parts_suppliers, component=Component.PARTS_FOR_RECYCLER)
+        self.get_component_from_suppliers(suppliers=parts_suppliers, component=Component.PARTS_FOR_RECYCLER)
 
     def update(self):
         """
