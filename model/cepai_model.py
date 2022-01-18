@@ -133,24 +133,34 @@ class CEPAIModel(Model):
             for _ in range(agent_count):
                 if agent_type is Refiner:
                     externality_factor = self.levers["L4: Include externality for virgin plastic"]
-                    new_agent = agent_type(self.next_id(), self, all_agents, externality_factor)
+                    shock_probability = self.uncertainties["X2: Annual probability for global oil shock"]
+                    annual_price_increase = self.uncertainties["X1: Annual increase factor of oil price"]
+                    new_agent = agent_type(self.next_id(), self, all_agents, externality_factor, shock_probability,
+                                           annual_price_increase)
+
                 elif agent_type is PartsManufacturer:
                     requirement_high = self.levers["L2: Minimal requirement for high-quality plastic"]
                     requirement_low = self.levers["L5: Minimal requirement for recyclate"] - requirement_high
                     minimal_requirements = {Component.RECYCLATE_HIGH: requirement_high,
                                             Component.RECYCLATE_LOW: requirement_low}
                     new_agent = agent_type(self.next_id(), self, all_agents, minimal_requirements)
+
                 elif agent_type is CarManufacturer:
                     new_agent = agent_type(self.next_id(), self, all_agents, self.get_next_brand(), self.nr_of_parts,
                                            self.break_down_probability)
                 elif agent_type is User:
                     new_agent = self.create_user(all_agents)
+
                 elif agent_type is Garage:
                     minimal_requirement = self.levers["L1: Minimal requirement for reused parts"]
                     new_agent = agent_type(self.next_id(), self, all_agents, minimal_requirement)
+
                 elif agent_type is Recycler:
-                    efficiency_factor = self.levers["L3: Use better solvable cohesives"]
-                    new_agent = agent_type(self.next_id(), self, all_agents, efficiency_factor)
+                    cohesive_factor = self.levers["L3: Use better solvable cohesives"]
+                    annual_efficiency_increase = self.uncertainties["X3: Annual increase of recycling efficiency"]
+                    new_agent = agent_type(self.next_id(), self, all_agents, annual_efficiency_increase,
+                                           cohesive_factor)
+
                 else:
                     """
                     With the current model, in which garages receive cars and repair them in the same tick, I didn't

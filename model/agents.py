@@ -386,22 +386,37 @@ class Refiner(GenericAgent):
     Refiner agent that produces virgin plastic.
     """
 
-    def __init__(self, unique_id, model, all_agents, externality_factor):
+    def __init__(self, unique_id, model, all_agents, externality_factor, shock_probability=0.0,
+                 annual_price_increase=1.0):
         """
+        :param annual_price_increase: float: facto by which the price increases linearly due to drying up of global oil
+        :param shock_probability: float: annual probability of a shock to the oil price
         :param externality_factor: float: factor by which price is increased to include externalities
         :param unique_id: int
         :param model: CEPAIModel
         :param all_agents: dictionary with {Agent: list of Agents}
         """
         super().__init__(unique_id, model, all_agents)
+        self.shock_probability = shock_probability
+        self.annual_price_increase = annual_price_increase
         self.stock[Component.VIRGIN] = math.inf
         self.prices[Component.VIRGIN] = self.random.normalvariate(mu=2.5, sigma=0.2) * externality_factor
 
     def update(self):
         """
         Update prices for the next instant depending on the sales trend within the last two instants.
+        And add a potential adjustment in case of an ail price shock.
         """
+        # Normal adjustment
         self.adjust_future_prices(component=Component.VIRGIN)
+
+        # Annual adjustment of price due to global oil drying up
+        self.prices[Component.VIRGIN] *= self.annual_price_increase  # Remark: compounding price increase
+
+        # Adjustment in case of a oil price shock
+        shock_factor = 1.5
+        if self.random.random() < self.shock_probability:
+            self.prices[Component.VIRGIN] *= shock_factor
 
 
 class Recycler(GenericAgent):
@@ -409,12 +424,14 @@ class Recycler(GenericAgent):
     Recycler agent that processes old parts and cars into recyclate plastic.
     """
 
-    def __init__(self, unique_id, model, all_agents, efficiency_factor):
+    def __init__(self, unique_id, model, all_agents, annual_efficiency_increase, cohesive_factor=1.0):
         """
-        :param efficiency_factor: float
+        :param annual_efficiency_increase: float: annual factor of how much efficiency improves
         :param unique_id: int
         :param model: CEPAIModel
         :param all_agents: dictionary with {Agent: list of Agents}
+        :param cohesive_factor: float: how much efficiency increases due to better solvable cohesives
+
         """
         super().__init__(unique_id, model, all_agents)
 
@@ -430,15 +447,16 @@ class Recycler(GenericAgent):
         self.demand[Component.PARTS_FOR_RECYCLER] = math.inf  # Take all parts
 
         # 'efficiency' for recyclers control how many times RECYCLATE_HIGH can be recycled as RECYCLATE_HIGH
-        self.efficiency = 0.5
-        self.efficiency_factor = efficiency_factor
+        self.efficiency = min(1.0, 0.5 * cohesive_factor)
+        self.annual_efficiency_increase = annual_efficiency_increase
 
     def update_efficiency(self):
         """
         Updates the recyclying efficiency every year.
         Assumption: Recycling technology improves every year.
         """
-        self.efficiency *= self.efficiency_factor
+        self.efficiency *= self.annual_efficiency_increase
+        self.efficiency = min(1.0, self.efficiency)
 
     def process_components(self):
         """
