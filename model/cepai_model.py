@@ -72,7 +72,16 @@ class CEPAIModel(Model):
 
         self.schedule = StagedActivation(self, stage_list=["get_all_components", "process_components", "update"])
         self.all_agents = self.create_all_agents()
-        self.datacollector = DataCollector(model_reporters={})
+        self.datacollector = DataCollector(model_reporters={
+            "amount virgin": self.get_amount_virgin,
+            "amount recyclate high": self.get_amount_recyclate_high,
+            "amount recyclate low": self.get_amount_recyclate_low,
+            "amount reused parts": self.get_amount_reused_parts,
+            "amount standard parts": self.get_amount_standard_parts,
+            "amount leakage": self.get_amount_of_leakage,
+            "price virgin": self.get_price_of_virgin,
+            "price recyclate": self.get_price_of_recyclate
+        })
 
     def run(self, steps=50, time_tracking=False):
         """
@@ -203,5 +212,136 @@ class CEPAIModel(Model):
         """
         Executes a model step.
         """
-        self.datacollector.collect(self)
         self.schedule.step()
+        self.datacollector.collect(self)
+
+    def get_amount_virgin(self):
+        """
+        Get total amount of VIRGIN plastic in all cars of all users.
+        :return:
+            amount: float
+        """
+        amount = self.get_amount_of_plastic(Component.VIRGIN)
+        return amount
+
+    def get_amount_recyclate_high(self):
+        """
+        Get total amount of RECYCLATE_HIGH plastic in all cars of all users.
+        :return:
+            amount: float
+        """
+        amount = self.get_amount_of_plastic(Component.RECYCLATE_HIGH)
+        return amount
+
+    def get_amount_recyclate_low(self):
+        """
+        Get total amount of RECYCLATE_LOW plastic in all cars of all users.
+        :return:
+            amount: float
+        """
+        amount = self.get_amount_of_plastic(Component.RECYCLATE_LOW)
+        return amount
+
+    def get_amount_of_plastic(self, component):
+        """
+        Get total amount of a specific plastic in all cars of all users.
+        :param component: Component in {VIRGIN, RECYCLATE_HIGH, RECYCLATE_LOW}
+        :return:
+            amount: float
+        """
+        users = self.all_agents[User]
+        amount = 0.0
+
+        for user in users:
+            if user.stock[Component.CARS]:
+                car = user.stock[Component.CARS][0]
+                parts = car.parts
+                for part in parts:
+                    amount += part.plastic_ratio[component]
+
+        return amount
+
+    def get_amount_reused_parts(self):
+        """
+        Get total amount of reused parts in all cars of all users.
+        :return:
+            amount: int
+        """
+        amount = self.get_amount_of_parts(PartState.REUSED)
+        return amount
+
+    def get_amount_standard_parts(self):
+        """
+        Get total amount of standard parts in all cars of all users.
+        :return:
+            amount: int
+        """
+        amount = self.get_amount_of_parts(PartState.STANDARD)
+        return amount
+
+    def get_amount_of_parts(self, part_state):
+        """
+        Get total amount of a specific part in all cars of all users.
+        :param part_state: PartState
+        :return:
+            amount: int
+        """
+        users = self.all_agents[User]
+        amount = 0
+
+        for user in users:
+            if user.stock[Component.CARS]:
+                car = user.stock[Component.CARS][0]
+                parts = car.parts
+                for part in parts:
+                    if part.state == part_state:
+                        amount += 1
+
+        return amount
+
+    def get_amount_of_leakage(self):
+        """
+        Get total amount of leaked plastic that the recyclers are getting rid off.
+        :return:
+            amount: float
+        """
+        amount = 0.0
+
+        recyclers = self.all_agents[Recycler]
+
+        for recycler in recyclers:
+            amount += recycler.current_leakage
+
+        return amount
+
+    def get_price_of_virgin(self):
+        """
+        Get the average price of VIRGIN plastic over all Refiners.
+        :return:
+            price: float
+        """
+        refiners = self.all_agents[Refiner]
+        prices = []
+        for refiner in refiners:
+            prices.append(refiner.prices[Component.VIRGIN])
+
+        price = sum(prices) / len(prices)
+        return price
+
+    def get_price_of_recyclate(self):
+        """
+        Get the average price of recyclate plastic over all Recyclers.
+        :return:
+            price: float
+        """
+
+        recyclers = self.all_agents[Recycler]
+        prices = []
+        for recycler in recyclers:
+            price_high = recycler.prices[Component.RECYCLATE_HIGH]
+            price_low = recycler.prices[Component.RECYCLATE_LOW]
+            prices.append(price_high)
+            prices.append(price_low)
+
+        price = sum(prices) / len(prices)
+        return price

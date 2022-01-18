@@ -450,6 +450,8 @@ class Recycler(GenericAgent):
         self.efficiency = min(1.0, 0.5 * cohesive_factor)
         self.annual_efficiency_increase = annual_efficiency_increase
 
+        self.current_leakage = 0.0
+
     def update_efficiency(self):
         """
         Updates the recyclying efficiency every year.
@@ -462,6 +464,9 @@ class Recycler(GenericAgent):
         """
         Recycler recycles discarded parts and cars.
         """
+
+        # Reset current_leakage of current instant
+        self.current_leakage = 0.0
 
         # Recycle discarded parts
         for part in self.stock[Component.PARTS_FOR_RECYCLER]:
@@ -488,6 +493,7 @@ class Recycler(GenericAgent):
             self.stock[Component.RECYCLATE_LOW] += plastic_ratio[Component.RECYCLATE_LOW]
         else:
             self.stock[Component.RECYCLATE_LOW] += plastic_ratio[Component.RECYCLATE_HIGH]
+            self.current_leakage += plastic_ratio[Component.RECYCLATE_LOW]
 
     def get_all_components(self):
         """
