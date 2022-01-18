@@ -93,13 +93,19 @@ class GenericAgent(Agent):
 
         return suppliers_sorted
 
-    def get_component_from_suppliers(self, suppliers, component):
+    def get_component_from_suppliers(self, suppliers, component, amount=None):
         """
         Go through the suppliers and try to buy a specific component.
+        Either try to get components in order to cover own demand or to get a specific amount of components.
+        :param amount: int
         :param suppliers: list of Agents
         :param component: Component that this agent demands
         """
-        rest_demand = self.demand[component]
+
+        if amount is None:
+            rest_demand = self.demand[component]
+        else:
+            rest_demand = amount
 
         while suppliers and rest_demand > 0.0:
             supplier = suppliers[0]
@@ -240,8 +246,7 @@ class GenericAgent(Agent):
         noise = self.random.normalvariate(mu=1.0, sigma=0.2)
 
         if prev_year != 0 and prev_prev_year != 0:
-            self.prices[component] = self.prices[component] * \
-                                     prev_year / prev_prev_year * noise
+            self.prices[component] = self.prices[component] * prev_year / prev_prev_year * noise
         else:
             self.prices[component] = component.get_random_price()
 
@@ -255,8 +260,7 @@ class GenericAgent(Agent):
         noise = self.random.normalvariate(mu=1.0, sigma=0.2)
 
         if prev_year != 0 and prev_prev_year != 0:
-            self.demand[component] = self.demand[component] * \
-                                     prev_year / prev_prev_year * noise
+            self.demand[component] = self.demand[component] * prev_year / prev_prev_year * noise
             if component == Component.PARTS or component == Component.CARS:
                 self.demand[component] = round(self.demand[component])
         else:
@@ -268,7 +272,7 @@ class PartsManufacturer(GenericAgent):
     PartsManufacturer agent.
     """
 
-    def __init__(self, unique_id, model, all_agents):
+    def __init__(self, unique_id, model, all_agents, minimal_requirements):
         """
         :param unique_id: int
         :param model: CEPAIModel
@@ -276,7 +280,7 @@ class PartsManufacturer(GenericAgent):
         """
         super().__init__(unique_id, model, all_agents)
 
-        self.demand = {  # NOTE: Should init using requirements
+        self.demand = {  # TODO: Should init using requirements
             Component.VIRGIN: self.random.normalvariate(mu=2.0, sigma=0.2),
             Component.RECYCLATE_LOW: self.random.normalvariate(mu=2.0, sigma=0.2),
             Component.RECYCLATE_HIGH: self.random.normalvariate(mu=3.0, sigma=0.1),
@@ -292,11 +296,7 @@ class PartsManufacturer(GenericAgent):
             Component.PARTS: [Part() for _ in range(100)]
         }
 
-        self.minimum_requirements = {
-            Component.RECYCLATE_LOW: 0.2,
-            Component.RECYCLATE_HIGH: 0.2
-        }
-
+        self.minimum_requirements = minimal_requirements
         self.plastic_ratio = self.compute_plastic_ratio()
 
     def process_components(self):
@@ -386,15 +386,16 @@ class Refiner(GenericAgent):
     Refiner agent that produces virgin plastic.
     """
 
-    def __init__(self, unique_id, model, all_agents):
+    def __init__(self, unique_id, model, all_agents, externality_factor):
         """
+        :param externality_factor: float: factor by which price is increased to include externalities
         :param unique_id: int
         :param model: CEPAIModel
         :param all_agents: dictionary with {Agent: list of Agents}
         """
         super().__init__(unique_id, model, all_agents)
         self.stock[Component.VIRGIN] = math.inf
-        self.prices[Component.VIRGIN] = self.random.normalvariate(mu=2.5, sigma=0.2)  # cost per unit
+        self.prices[Component.VIRGIN] = self.random.normalvariate(mu=2.5, sigma=0.2) * externality_factor
 
     def update(self):
         """
@@ -408,8 +409,9 @@ class Recycler(GenericAgent):
     Recycler agent that processes old parts and cars into recyclate plastic.
     """
 
-    def __init__(self, unique_id, model, all_agents):
+    def __init__(self, unique_id, model, all_agents, efficiency_factor):
         """
+        :param efficiency_factor: float
         :param unique_id: int
         :param model: CEPAIModel
         :param all_agents: dictionary with {Agent: list of Agents}
@@ -429,6 +431,14 @@ class Recycler(GenericAgent):
 
         # 'efficiency' for recyclers control how many times RECYCLATE_HIGH can be recycled as RECYCLATE_HIGH
         self.efficiency = 0.5
+        self.efficiency_factor = efficiency_factor
+
+    def update_efficiency(self):
+        """
+        Updates the recyclying efficiency every year.
+        Assumption: Recycling technology improves every year.
+        """
+        self.efficiency *= self.efficiency_factor
 
     def process_components(self):
         """
@@ -481,6 +491,7 @@ class Recycler(GenericAgent):
         """
         self.adjust_future_prices(component=Component.RECYCLATE_LOW)
         self.adjust_future_prices(component=Component.RECYCLATE_HIGH)
+        self.update_efficiency()
 
 
 class CarManufacturer(GenericAgent):
@@ -683,8 +694,10 @@ class Garage(GenericAgent):
     Garages repair cars, and send ELVs to dismantlers or recyclers.
     """
 
-    def __init__(self, unique_id, model, all_agents, circularity_friendliness=0.2):
+    def __init__(self, unique_id, model, all_agents, circularity_friendliness=0.2, min_reused_parts=0.0):
         """
+         :param circularity_friendliness:
+         :param min_reused_parts: float
          :param unique_id: int
          :param model: CEPAIModel
          :param all_agents: dictionary with {Agent: list of Agents}
@@ -707,12 +720,20 @@ class Garage(GenericAgent):
         self.demand[Component.PARTS] = round(self.random.normalvariate(mu=100.0, sigma=2))
         self.default_demand[Component.PARTS] = self.demand[Component.PARTS]
 
+        self.min_reused_parts = min_reused_parts
         self.current_year_demand = 0
 
     def get_all_components(self):
         """
         Determine the order of suppliers by personal preference and then buy components.
         """
+
+        # Get first reused Parts according to minimum requirements
+        nr_of_needed_reused_parts = math.ceil(self.demand[Component.PARTS] * self.min_reused_parts)
+        dismantlers = self.all_agents[Dismantler]
+        self.get_component_from_suppliers(dismantlers, component=Component.PARTS, amount=nr_of_needed_reused_parts)
+
+        # Get remaining parts from all suppliers
         parts_suppliers = self.all_agents[PartsManufacturer] + self.all_agents[Dismantler]
         parts_suppliers = self.get_sorted_suppliers(suppliers=parts_suppliers, component=Component.PARTS)
         self.get_component_from_suppliers(suppliers=parts_suppliers, component=Component.PARTS)
