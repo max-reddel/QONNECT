@@ -208,7 +208,7 @@ class GenericAgent(Agent):
     def sufficient_stock(rest_demand, stock_of_supplier):
         """
         Check whether there is enough stock to cover the demand.
-        Take into account different data types of input parameters.
+        Take into account different data types of scenarios parameters.
         :param rest_demand: float/int
         :param stock_of_supplier: float/set
         :return:
@@ -280,20 +280,23 @@ class PartsManufacturer(GenericAgent):
         """
         super().__init__(unique_id, model, all_agents)
 
-        self.demand = {  # TODO: Should init using requirements
-            Component.VIRGIN: self.random.normalvariate(mu=2.0, sigma=0.2),
-            Component.RECYCLATE_LOW: self.random.normalvariate(mu=2.0, sigma=0.2),
-            Component.RECYCLATE_HIGH: self.random.normalvariate(mu=3.0, sigma=0.1),
-            Component.PARTS: round(self.random.normalvariate(mu=50.0, sigma=10.0))  # How many parts to manufacture
+        init_plastic_ratio = self.compute_plastic_ratio()
+        demand_scaling_factor = 100
+        self.demand = {
+            Component.VIRGIN: init_plastic_ratio[Component.VIRGIN] * demand_scaling_factor,
+            Component.RECYCLATE_LOW: init_plastic_ratio[Component.RECYCLATE_LOW] * demand_scaling_factor,
+            Component.RECYCLATE_HIGH: init_plastic_ratio[Component.RECYCLATE_HIGH] * demand_scaling_factor,
+            Component.PARTS: round(self.random.normalvariate(mu=demand_scaling_factor, sigma=10.0))
         }
 
         self.default_demand = self.demand.copy()
 
+        stock_scaling_factor = 300
         self.stock = {
-            Component.VIRGIN: self.random.normalvariate(mu=2.0, sigma=0.2),
-            Component.RECYCLATE_LOW: self.random.normalvariate(mu=2.0, sigma=0.2),
-            Component.RECYCLATE_HIGH: self.random.normalvariate(mu=3.0, sigma=0.1),
-            Component.PARTS: [Part() for _ in range(100)]
+            Component.VIRGIN: init_plastic_ratio[Component.VIRGIN] * stock_scaling_factor,
+            Component.RECYCLATE_LOW: init_plastic_ratio[Component.RECYCLATE_LOW] * stock_scaling_factor,
+            Component.RECYCLATE_HIGH: init_plastic_ratio[Component.RECYCLATE_HIGH] * stock_scaling_factor,
+            Component.PARTS: [Part() for _ in range(stock_scaling_factor)]
         }
 
         self.minimum_requirements = minimal_requirements
@@ -661,7 +664,7 @@ class User(GenericAgent):
             if self.stock[Component.CARS]:
                 car = self.stock[Component.CARS][0]
                 # Add noise
-                car.max_lifetime = car.max_lifetime * self.random.normalvariate(1, self.std_use_intensity)
+                car.max_lifetime *= self.random.normalvariate(1, self.std_use_intensity)
 
     def bring_car_to_garage(self, car):
         """

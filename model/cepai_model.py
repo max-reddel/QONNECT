@@ -1,5 +1,5 @@
 """
-This module contains the plastic model which concerns the circular economy of plastic in the automotive industry.
+This module contains the plastic model which concerns the Dutch circular economy of plastic in the automotive industry.
 """
 
 from mesa import Model
@@ -29,25 +29,27 @@ class CEPAIModel(Model):
         :param break_down_probability: float: probability of a car breaking down at any given year
         :param std_use_intensity: float: standard value of how intensely a user uses a car
         """
-        print('Simulation starting...')
+        # print('Simulation starting...')
 
         super().__init__()
 
         if levers is None:
-            self.levers = {"L1: Minimal requirement for reused parts": 0.0,
-                           "L2: Minimal requirement for high-quality plastic": 0.0,
-                           "L3: Use better solvable cohesives": 1.0,
-                           "L4: Include externality for virgin plastic": 1.0,
-                           "L5: Minimal requirement for recyclate": 0.0
-                           }
+            self.levers = {
+                "L1": 0.0,  # Minimal requirement for reused parts
+                "L2": 0.0,  # Minimal requirement for high-quality plastic
+                "L3": 1.0,  # Use better solvable cohesives
+                "L4": 1.0,  # Include externality for virgin plastic
+                "L5": 0.0   # Minimal requirement for recyclate
+            }
         else:
             self.levers = levers
 
         if uncertainties is None:
-            self.uncertainties = {"X1: Annual increase factor of oil price": 1.0,
-                                  "X2: Annual probability for global oil shock": 0.0,
-                                  "X3: Annual increase of recycling efficiency": 1.0
-                                  }
+            self.uncertainties = {
+                "X1": 1.0,  # Annual increase factor of oil price
+                "X2": 0.0,  # Annual probability for global oil shock
+                "X3": 1.0   # Annual increase of recycling efficiency
+            }
         else:
             self.uncertainties = uncertainties
 
@@ -88,6 +90,9 @@ class CEPAIModel(Model):
         Runs the model for a specific amount of steps.
         :param steps: int: number of steps (in years)
         :param time_tracking: Boolean
+        :return:
+            output: Dataframe: all information that the datacollector gathered
+
         """
 
         start_time = time.time()
@@ -99,7 +104,10 @@ class CEPAIModel(Model):
             run_time = round(time.time() - start_time, 2)
             print(f'Run time: {run_time} seconds')
 
-        print('Simulation completed!')
+            print('Simulation completed!')
+
+        results = self.datacollector.get_model_vars_dataframe()
+        return results
 
     def get_next_brand(self):
         for car_manufacturer, exists in self.brands.items():
@@ -125,8 +133,9 @@ class CEPAIModel(Model):
             if lifetime_current == lifetime_vehicle:
                 state = CarState.FUNCTIONING
             else:
-                state = self.random.choices(list(CarState)[:2], weights=[self.break_down_probability,
-                                                                         1 - self.break_down_probability])[0]
+                state = self.random.choices(
+                    list(CarState)[:2],
+                    weights=[self.break_down_probability, 1 - self.break_down_probability])[0]
 
             car = Car(brand=brand, lifetime_current=lifetime_current, state=state, parts=parts)
         return car
@@ -140,16 +149,17 @@ class CEPAIModel(Model):
         all_agents = {}
         for agent_type, agent_count in self.agent_counts.items():
             for _ in range(agent_count):
+
                 if agent_type is Refiner:
-                    externality_factor = self.levers["L4: Include externality for virgin plastic"]
-                    shock_probability = self.uncertainties["X2: Annual probability for global oil shock"]
-                    annual_price_increase = self.uncertainties["X1: Annual increase factor of oil price"]
+                    externality_factor = self.levers["L4"]
+                    shock_probability = self.uncertainties["X2"]
+                    annual_price_increase = self.uncertainties["X1"]
                     new_agent = agent_type(self.next_id(), self, all_agents, externality_factor, shock_probability,
                                            annual_price_increase)
 
                 elif agent_type is PartsManufacturer:
-                    requirement_high = self.levers["L2: Minimal requirement for high-quality plastic"]
-                    requirement_low = self.levers["L5: Minimal requirement for recyclate"] - requirement_high
+                    requirement_high = self.levers["L2"]
+                    requirement_low = self.levers["L5"] - requirement_high
                     minimal_requirements = {Component.RECYCLATE_HIGH: requirement_high,
                                             Component.RECYCLATE_LOW: requirement_low}
                     new_agent = agent_type(self.next_id(), self, all_agents, minimal_requirements)
@@ -161,12 +171,12 @@ class CEPAIModel(Model):
                     new_agent = self.create_user(all_agents)
 
                 elif agent_type is Garage:
-                    minimal_requirement = self.levers["L1: Minimal requirement for reused parts"]
+                    minimal_requirement = self.levers["L1"]
                     new_agent = agent_type(self.next_id(), self, all_agents, minimal_requirement)
 
                 elif agent_type is Recycler:
-                    cohesive_factor = self.levers["L3: Use better solvable cohesives"]
-                    annual_efficiency_increase = self.uncertainties["X3: Annual increase of recycling efficiency"]
+                    cohesive_factor = self.levers["L3"]
+                    annual_efficiency_increase = self.uncertainties["X3"]
                     new_agent = agent_type(self.next_id(), self, all_agents, annual_efficiency_increase,
                                            cohesive_factor)
 
