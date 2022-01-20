@@ -658,6 +658,7 @@ class User(GenericAgent):
             car_manufacturers = self.all_agents[CarManufacturer]
             car_manufacturers = self.get_sorted_suppliers(suppliers=car_manufacturers, component=Component.CARS)
             self.get_component_from_suppliers(suppliers=car_manufacturers, component=Component.CARS)
+            #self.demand[Component.CARS] = 0
 
             # Adjust lifetime of car
             if self.stock[Component.CARS]:
@@ -671,7 +672,11 @@ class User(GenericAgent):
         Bring car to garage of choice in case it is broken or total loss. Currently, garage is randomly chosen.
         """
 
-        if car.state == CarState.BROKEN or car.state == CarState.END_OF_LIFE:
+        if car.state == CarState.BROKEN:
+            garage_of_choice = self.select_garage()
+            garage_of_choice.receive_car_from_user(user=self, car=car)
+
+        if car.state == CarState.END_OF_LIFE:
             garage_of_choice = self.select_garage()
             garage_of_choice.receive_car_from_user(user=self, car=car)
 
