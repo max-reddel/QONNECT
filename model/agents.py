@@ -334,8 +334,8 @@ class PartsManufacturer(GenericAgent):
                 Component.RECYCLATE_HIGH: plastic_ratio[Component.RECYCLATE_HIGH] / ratio_recyclables
             }
 
-            # Adjust virgin plastic weight such that the sum of all plastic will be 1.0
-            plastic_ratio[Component.VIRGIN] = max(0.0, 1.0 - sum(plastic_ratio.values()))
+        # Adjust virgin plastic weight such that the sum of all plastic will be 1.0
+        plastic_ratio[Component.VIRGIN] = max(0.0, 1.0 - ratio_recyclables)
 
         return plastic_ratio
 
@@ -658,10 +658,10 @@ class User(GenericAgent):
             car_manufacturers = self.all_agents[CarManufacturer]
             car_manufacturers = self.get_sorted_suppliers(suppliers=car_manufacturers, component=Component.CARS)
             self.get_component_from_suppliers(suppliers=car_manufacturers, component=Component.CARS)
-            self.demand[Component.CARS] = 0
 
             # Adjust lifetime of car
             if self.stock[Component.CARS]:
+                self.demand[Component.CARS] = 0
                 car = self.stock[Component.CARS][0]
                 # Add noise
                 car.max_lifetime *= self.random.normalvariate(1, self.std_use_intensity)
@@ -671,7 +671,7 @@ class User(GenericAgent):
         Bring car to garage of choice in case it is broken or total loss. Currently, garage is randomly chosen.
         """
 
-        if car.state == (CarState.BROKEN or CarState.END_OF_LIFE):
+        if car.state == CarState.BROKEN or car.state == CarState.END_OF_LIFE:
             garage_of_choice = self.select_garage()
             garage_of_choice.receive_car_from_user(user=self, car=car)
 
@@ -774,10 +774,7 @@ class Garage(GenericAgent):
         :param car: Car
         """
         component = Component.CARS
-        # To make functions work for receiving cars.
-        self.demand[component] = 1
-
-        self.get_component_from_suppliers(suppliers=[user], component=component)
+        user.provide(recipient=self, component=component, amount=1)
 
         if car.state == CarState.BROKEN:
             self.customer_base[car] = user
@@ -809,8 +806,7 @@ class Garage(GenericAgent):
 
                 # Return car to user
                 user = self.customer_base[car]
-                self.provide(recipient=user, component=Component.CARS, amount=1)
-                user.car_repair = False
+                user.stock[Component.CARS].append(car)
 
                 # Remove user
                 self.customer_base.pop(car)
