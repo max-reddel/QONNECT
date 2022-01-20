@@ -373,7 +373,7 @@ class PartsManufacturer(GenericAgent):
         noise = self.random.normalvariate(mu=1.0, sigma=0.2)
 
         if prev_year != 0 and prev_prev_year != 0:  # First instant of simulation
-            self.demand[component] = self.demand[component] * prev_year / prev_prev_year * noise
+            self.demand[component] = self.demand[component] * min(1, prev_year / prev_prev_year * noise)
             self.demand[component] = round(self.demand[component])
         else:  # All other instants of simulation
             self.demand[component] = self.default_demand[component]
