@@ -266,6 +266,8 @@ class GenericAgent(Agent):
         Adjust the demand of an agent's component for the next instant.
         :param component: Component
         """
+        self.demand[component] = self.default_demand[component]
+
         prev_year = self.sold_volume['last']
         prev_prev_year = self.sold_volume['second_last']
         noise = self.random.normalvariate(mu=1.0, sigma=0.2)
@@ -277,6 +279,7 @@ class GenericAgent(Agent):
             self.demand[component] = self.demand[component] * demand_scaling_factor
             if component == Component.PARTS or component == Component.CARS:
                 self.demand[component] = round(self.demand[component])
+            self.default_demand[component] = self.demand[component]
         else:
             self.demand[component] = self.default_demand[component]
 
@@ -643,11 +646,13 @@ class CarManufacturer(GenericAgent):
             demand_scaling_factor = noise * min(self.max_demand_scaling,
                                                 max(self.min_demand_scaling,
                                                     demand_scaling_factor))
-            self.demand[component] = self.demand[Component.CARS] * demand_scaling_factor
-            self.demand[component] = round(self.demand[component]) * self.nr_of_parts
+            self.demand[Component.CARS] = round(self.demand[Component.CARS] * demand_scaling_factor)
+            self.demand[component] = self.demand[Component.CARS] * self.nr_of_parts
 
         elif prev_year != 0 or prev_prev_year != 0:
-            self.demand[component] = sum(self.sold_volume.values()) * self.nr_of_parts
+            sold_last_two_years = sum(self.sold_volume.values())
+            self.demand[Component.CARS] = sold_last_two_years
+            self.demand[component] = self.demand[Component.CARS] * self.nr_of_parts
 
         else:
             self.demand[component] = self.default_demand[component]
@@ -695,6 +700,40 @@ class User(GenericAgent):
                 car = self.stock[Component.CARS][0]
                 # Add noise
                 car.max_lifetime *= self.random.normalvariate(1, self.std_use_intensity)
+
+    def get_component_from_suppliers(self, suppliers, component, amount=None):
+        """
+        Go through the suppliers and try to buy a specific component.
+        Either try to get components in order to cover own demand or to get a specific amount of components.
+        :param amount: int
+        :param suppliers: list of Agents
+        :param component: Component that this agent demands
+
+        """
+
+        cheapest_supplier = suppliers[0]
+        chosen_supplier = None
+
+        if amount is None:
+            rest_demand = self.demand[component]
+        else:
+            rest_demand = amount
+
+        while suppliers:
+            supplier = suppliers[0]
+            stock_of_supplier = supplier.get_stock()[component]
+
+            if self.sufficient_stock(rest_demand, stock_of_supplier):
+                supplier.provide(recipient=self, component=component, amount=rest_demand)
+                supplier.register_sales(rest_demand)
+                chosen_supplier = supplier
+                break
+
+            suppliers = suppliers[1:]
+
+        # If car suppliers have no cars, register that it still wants a car.
+        if chosen_supplier is None:
+            cheapest_supplier.register_sales(rest_demand)
 
     def bring_car_to_garage(self, car):
         """
