@@ -72,6 +72,14 @@ class GenericAgent(Agent):
         # Track how much was sold last tick and the the tick before that
         self.sold_volume = {'last': 0, 'second_last': 0}
 
+        self.demand_elasticity = 0.5
+        self.max_demand_scaling = 2.0
+        self.min_demand_scaling = 1.0 / self.max_demand_scaling
+
+        self.price_elasticity = 0.1
+        self.max_price_scaling = 1.1
+        self.min_price_scaling = 1.0 / self.max_price_scaling
+
     def get_all_components(self):
         """
         Determine the order of suppliers by personal preference and then buy components.
@@ -246,7 +254,10 @@ class GenericAgent(Agent):
         noise = self.random.normalvariate(mu=1.0, sigma=0.2)
 
         if prev_year != 0 and prev_prev_year != 0:
-            self.prices[component] = self.prices[component] * prev_year / prev_prev_year * noise
+            price_scaling_factor = noise * min(self.max_price_scaling,
+                                               max(self.min_price_scaling,
+                                                   (prev_year / prev_prev_year) ** self.price_elasticity))
+            self.prices[component] = self.prices[component] * price_scaling_factor
         else:
             self.prices[component] = component.get_random_price()
 
@@ -260,7 +271,10 @@ class GenericAgent(Agent):
         noise = self.random.normalvariate(mu=1.0, sigma=0.2)
 
         if prev_year != 0 and prev_prev_year != 0:
-            self.demand[component] = self.demand[component] * prev_year / prev_prev_year * noise
+            demand_scaling_factor = noise * min(self.max_demand_scaling,
+                                                max(self.min_demand_scaling,
+                                                    (prev_year / prev_prev_year) ** self.demand_elasticity))
+            self.demand[component] = self.demand[component] * demand_scaling_factor
             if component == Component.PARTS or component == Component.CARS:
                 self.demand[component] = round(self.demand[component])
         else:
@@ -365,7 +379,7 @@ class PartsManufacturer(GenericAgent):
 
     def adjust_future_demand(self, component):
         """
-        Parts manufacturers update their demand for parts and according to their plastic ratios, they update their
+        Parts manufacturers update their demand for parts, and according to their plastic ratios they update their
         demand for raw materials.
         """
         prev_year = self.sold_volume['last']
@@ -373,8 +387,15 @@ class PartsManufacturer(GenericAgent):
         noise = self.random.normalvariate(mu=1.0, sigma=0.2)
 
         if prev_year != 0 and prev_prev_year != 0:  # First instant of simulation
-            self.demand[component] = self.demand[component] * min(1, prev_year / prev_prev_year * noise)
+            demand_scaling_factor = noise * min(self.max_demand_scaling,
+                                                max(self.min_demand_scaling,
+                                                    (prev_year / prev_prev_year) ** self.demand_elasticity))
+            self.demand[component] = self.demand[component] * demand_scaling_factor
             self.demand[component] = round(self.demand[component])
+
+        elif prev_year != 0 or prev_prev_year != 0:
+            self.demand[component] = sum(self.sold_volume.values())
+
         else:  # All other instants of simulation
             self.demand[component] = self.default_demand[component]
 
@@ -591,6 +612,7 @@ class CarManufacturer(GenericAgent):
         Update sold volumes.
         Update prices and demand for the next instant depending on the sales trend within the last two instants.
         """
+
         self.sold_volume['second_last'] = self.sold_volume['last']
         self.sold_volume['last'] = self.current_year_sales
 
@@ -612,13 +634,21 @@ class CarManufacturer(GenericAgent):
         Car manufacturers adjust demand differently than other agents, because they supply different components than
         they receive.
         """
-        prev_year = self.sold_volume['last'] * self.nr_of_parts
-        prev_prev_year = self.sold_volume['second_last'] * self.nr_of_parts
+        prev_year = self.sold_volume['last']
+        prev_prev_year = self.sold_volume['second_last']
         noise = self.random.normalvariate(mu=1.0, sigma=0.2)
 
         if prev_year != 0 and prev_prev_year != 0:
-            self.demand[component] = self.demand[component] * prev_year / prev_prev_year * noise
-            self.demand[component] = round(self.demand[component])
+            demand_scaling_factor = (prev_year / prev_prev_year) ** self.demand_elasticity
+            demand_scaling_factor = noise * min(self.max_demand_scaling,
+                                                max(self.min_demand_scaling,
+                                                    demand_scaling_factor))
+            self.demand[component] = self.demand[Component.CARS] * demand_scaling_factor
+            self.demand[component] = round(self.demand[component]) * self.nr_of_parts
+
+        elif prev_year != 0 or prev_prev_year != 0:
+            self.demand[component] = sum(self.sold_volume.values()) * self.nr_of_parts
+
         else:
             self.demand[component] = self.default_demand[component]
 
@@ -658,7 +688,6 @@ class User(GenericAgent):
             car_manufacturers = self.all_agents[CarManufacturer]
             car_manufacturers = self.get_sorted_suppliers(suppliers=car_manufacturers, component=Component.CARS)
             self.get_component_from_suppliers(suppliers=car_manufacturers, component=Component.CARS)
-            #self.demand[Component.CARS] = 0
 
             # Adjust lifetime of car
             if self.stock[Component.CARS]:
