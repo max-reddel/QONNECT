@@ -175,7 +175,7 @@ class CEPAIModel(Model):
 
                 elif agent_type is Garage:
                     minimal_requirement = self.levers["L1"]
-                    new_agent = agent_type(self.next_id(), self, all_agents, minimal_requirement)
+                    new_agent = agent_type(self.next_id(), self, all_agents, min_reused_parts=minimal_requirement)
 
                 elif agent_type is Recycler:
                     cohesive_factor = self.levers["L3"]

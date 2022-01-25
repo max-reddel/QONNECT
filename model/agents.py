@@ -1043,7 +1043,8 @@ class Dismantler(GenericAgent):
 
         self.stock[Component.PARTS] = [Part() for _ in range(100)]
         self.stock[Component.PARTS_FOR_RECYCLER] = [Part(state=PartState.REUSED) for _ in range(100)]
-        self.stock[Component.CARS] = [Car() for _ in range(10)]
+        self.stock[Component.CARS_FOR_DISMANTLER] = [Car() for _ in range(10)]
+        self.stock[Component.PARTS_TO_REUSE] = []
 
         self.demand[Component.CARS_FOR_DISMANTLER] = math.inf
 
@@ -1051,12 +1052,15 @@ class Dismantler(GenericAgent):
 
     def process_components(self):
         """
-        Dismanters dismantle cars into parts as follows:
+        Dismantlers dismantle cars into parts as follows:
             STANDARD -> REUSED
             REUSED -> PARTS_FOR_RECYCLER
         """
-
-        for car in self.stock[Component.CARS]:
+        while self.stock[Component.CARS_FOR_DISMANTLER]:
+            # Remove the car from the inventory
+            car = self.stock[Component.CARS_FOR_DISMANTLER][0]
+            self.stock[Component.CARS_FOR_DISMANTLER] = self.stock[Component.CARS_FOR_DISMANTLER][1:]
+            
             for part in car.parts:
                 if part.state == PartState.STANDARD:
                     part.reuse()
