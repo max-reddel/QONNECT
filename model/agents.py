@@ -72,8 +72,9 @@ class GenericAgent(Agent):
         # Track how much was sold last tick and the the tick before that
         self.sold_volume = {'last': 0, 'second_last': 0}
 
-        self.demand_elasticity = 0.5
-        self.max_demand_scaling = 2.0
+        # The following numbers have been adjusted
+        self.demand_elasticity = 0.2  # earlier: 0.5
+        self.max_demand_scaling = 1.2  # earlier: 2.0
         self.min_demand_scaling = 1.0 / self.max_demand_scaling
 
         self.price_elasticity = 0.1
@@ -258,7 +259,7 @@ class GenericAgent(Agent):
             price_scaling_factor = noise * min(self.max_price_scaling,
                                                max(self.min_price_scaling,
                                                    (prev_year / prev_prev_year) ** self.price_elasticity))
-            self.prices[component] = self.prices[component] * price_scaling_factor
+            self.prices[component] *= price_scaling_factor
         else:
             self.prices[component] = component.get_random_price()
 
@@ -277,7 +278,7 @@ class GenericAgent(Agent):
             demand_scaling_factor = noise * min(self.max_demand_scaling,
                                                 max(self.min_demand_scaling,
                                                     (prev_year / prev_prev_year) ** self.demand_elasticity))
-            self.demand[component] = self.demand[component] * demand_scaling_factor
+            self.demand[component] *= demand_scaling_factor
             if component == Component.PARTS or component == Component.CARS:
                 self.demand[component] = round(self.demand[component])
             self.default_demand[component] = self.demand[component]
@@ -310,6 +311,7 @@ class PartsManufacturer(GenericAgent):
         self.default_demand = self.demand.copy()
 
         stock_scaling_factor = 300
+
         self.stock = {
             Component.VIRGIN: init_plastic_ratio[Component.VIRGIN] * stock_scaling_factor,
             Component.RECYCLATE_LOW: init_plastic_ratio[Component.RECYCLATE_LOW] * stock_scaling_factor,
@@ -320,6 +322,8 @@ class PartsManufacturer(GenericAgent):
         self.minimum_requirements = minimal_requirements
         self.plastic_ratio = self.compute_plastic_ratio()
 
+        self.current_year_sales = 0
+
     def process_components(self):
         """
         Manufacture parts out of plastic.
@@ -327,8 +331,28 @@ class PartsManufacturer(GenericAgent):
         """
 
         for _ in range(self.demand[Component.PARTS]):
-            new_part = Part(self.plastic_ratio)
-            self.stock[Component.PARTS].append(new_part)
+
+            # Check whether there is enough plastic in the stock
+            virgin = self.plastic_ratio[Component.VIRGIN]
+            recyclate_high = self.plastic_ratio[Component.RECYCLATE_HIGH]
+            recyclate_low = self.plastic_ratio[Component.RECYCLATE_LOW]
+
+            if (virgin >= self.stock[Component.VIRGIN] and
+                    recyclate_high >= self.stock[Component.RECYCLATE_HIGH] and
+                    recyclate_low >= self.stock[Component.RECYCLATE_LOW]):
+
+                # Create new part
+                new_part = Part(self.plastic_ratio)
+                self.stock[Component.PARTS].append(new_part)
+
+                # Remove plastic from stock
+                self.stock[Component.VIRGIN] -= virgin
+                self.stock[Component.RECYCLATE_HIGH] -= recyclate_high
+                self.stock[Component.RECYCLATE_LOW] -= recyclate_low
+
+            else:
+                # Otherwise, stop producing parts
+                break
 
     def compute_plastic_ratio(self):
         """
@@ -379,6 +403,10 @@ class PartsManufacturer(GenericAgent):
         """
         Update prices and demand for the next instant depending on the sales trend within the last two instants.
         """
+        self.sold_volume['second_last'] = self.sold_volume['last']
+        self.sold_volume['last'] = self.current_year_sales
+        self.current_year_sales = 0
+
         self.adjust_future_prices(component=Component.PARTS)
         self.adjust_future_demand(component=Component.PARTS)
 
@@ -386,18 +414,18 @@ class PartsManufacturer(GenericAgent):
         """
         Parts manufacturers update their demand for parts, and according to their plastic ratios they update their
         demand for raw materials.
-        TODO: somehow still the demand keeps exploding. It seems that the sold volume previous year keeps increasing
         and that previous previous year does not increase.
         """
         prev_year = self.sold_volume['last']
         prev_prev_year = self.sold_volume['second_last']
-        noise = self.random.normalvariate(mu=1.0, sigma=0.2)
+        noise = self.random.normalvariate(mu=1.0, sigma=0.05)
 
         if prev_year != 0 and prev_prev_year != 0:  # First instant of simulation
             demand_scaling_factor = noise * min(self.max_demand_scaling,
                                                 max(self.min_demand_scaling,
                                                     (prev_year / prev_prev_year) ** self.demand_elasticity))
-            self.demand[component] = self.demand[component] * demand_scaling_factor
+
+            self.demand[component] *= demand_scaling_factor
             self.demand[component] = round(self.demand[component])
 
         elif prev_year != 0 or prev_prev_year != 0:
@@ -406,10 +434,17 @@ class PartsManufacturer(GenericAgent):
         else:  # All other instants of simulation
             self.demand[component] = self.default_demand[component]
 
+        # Adjust demand for plastic as well
         self.plastic_ratio = self.compute_plastic_ratio()
-
         for plastic_type, ratio in self.plastic_ratio.items():
             self.demand[plastic_type] = ratio * self.demand[Component.PARTS]
+
+    def register_sales(self, sales):
+        """
+        Register the sales of an agent during the current instant. This can then be used later to adjust prices and e.g.
+        production of components.
+        """
+        self.current_year_sales += sales
 
 
 class Refiner(GenericAgent):
@@ -657,7 +692,6 @@ class CarManufacturer(GenericAgent):
             sold_last_two_years = sum(self.sold_volume.values())
             self.demand[Component.CARS] = sold_last_two_years
             self.demand[component] = self.demand[Component.CARS] * self.nr_of_parts
-
         else:
             self.demand[component] = self.default_demand[component]
 
@@ -901,16 +935,15 @@ class Garage(GenericAgent):
         Update yearly demand for parts.
         Update prices and demand for the next instant depending on the sales trend within the last two instants.
         """
-        self.adjust_future_demand(component=Component.PARTS)
-
         self.sold_volume['second_last'] = self.sold_volume['last']
         self.sold_volume['last'] = self.demand[Component.PARTS]
 
+        self.adjust_future_demand(component=Component.PARTS)
         self.adjust_future_prices(component=Component.PARTS)
 
     def adjust_future_demand(self, component):
         """
-        Garages update their demand different, because they are conceptually different. Garages anticipate more on cars
+        Garages update their demand differently, because they are conceptually different. Garages anticipate more on cars
         to be repaired to be able to repair them in the same year. They do so by checking whether they have enough stock
         to absorb shocks.
         """
