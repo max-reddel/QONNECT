@@ -612,9 +612,9 @@ class Recycler(GenericAgent):
             self.recycle_part(part=part)
 
         # Recycle cars and remove from inventory
-        # TODO: write in while loop, otherwise cars are not removed from stock somehow?
-        for car in self.stock[Component.CARS_FOR_RECYCLER]:
-            self.stock[Component.CARS_FOR_RECYCLER].remove(car)
+        while self.stock[Component.CARS_FOR_RECYCLER]:
+            car = self.stock[Component.CARS_FOR_RECYCLER][0]
+            self.stock[Component.CARS_FOR_RECYCLER] = self.stock[Component.CARS_FOR_RECYCLER][1:]
             for part in car.parts:
                 self.recycle_part(part=part)
 
