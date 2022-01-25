@@ -7,11 +7,11 @@ from model.cepai_model import *
 if __name__ == "__main__":
 
     levers = {
-        "L1": 0.0,  # Minimal requirement for reused parts
-        "L2": 0.0,  # Minimal requirement for high-quality plastic
+        "L1": 0.1,  # Minimal requirement for reused parts
+        "L2": 0.1,  # Minimal requirement for high-quality plastic
         "L3": 1.0,  # Use better solvable cohesives
         "L4": 1.0,  # Include externality for virgin plastic
-        "L5": 0.0  # Minimal requirement for recyclate
+        "L5": 0.3  # Minimal requirement for recyclate
     }
 
     uncertainties = {

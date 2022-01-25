@@ -29,21 +29,23 @@ class CEPAIModel(Model):
         :param break_down_probability: float: probability of a car breaking down at any given year
         :param std_use_intensity: float: standard value of how intensely a user uses a car
         """
-        # print('Simulation starting...')
+        print('Simulation starting...')
 
         super().__init__()
 
+        # TODO: specify value ranges for levers.
         if levers is None:
             self.levers = {
                 "L1": 0.0,  # Minimal requirement for reused parts
                 "L2": 0.0,  # Minimal requirement for high-quality plastic
-                "L3": 1.0,  # Use better solvable cohesives
+                "L3": 1.0,  # Use better solvable adhesives
                 "L4": 1.0,  # Include externality for virgin plastic
                 "L5": 0.0   # Minimal requirement for recyclate
             }
         else:
             self.levers = levers
 
+        # TODO: specify value ranges for uncertainties.
         if uncertainties is None:
             self.uncertainties = {
                 "X1": 1.0,  # Annual increase factor of oil price
@@ -98,6 +100,7 @@ class CEPAIModel(Model):
         start_time = time.time()
 
         for _ in range(steps):
+            print(f'Step: {_}')
             self.step()
 
         if time_tracking:
@@ -172,7 +175,7 @@ class CEPAIModel(Model):
 
                 elif agent_type is Garage:
                     minimal_requirement = self.levers["L1"]
-                    new_agent = agent_type(self.next_id(), self, all_agents, minimal_requirement)
+                    new_agent = agent_type(self.next_id(), self, all_agents, min_reused_parts=minimal_requirement)
 
                 elif agent_type is Recycler:
                     cohesive_factor = self.levers["L3"]

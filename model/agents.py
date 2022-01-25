@@ -69,8 +69,17 @@ class GenericAgent(Agent):
             Component.RECYCLATE_HIGH: 0.0
         }
 
-        # Track how much was sold last tick and the the tick before that
+        # Track how much was sold last tick and the tick before that
         self.sold_volume = {'last': 0, 'second_last': 0}
+
+        # The following numbers have been adjusted
+        self.demand_elasticity = 0.2  # earlier: 0.5
+        self.max_demand_scaling = 1.2  # earlier: 2.0
+        self.min_demand_scaling = 1.0 / self.max_demand_scaling
+
+        self.price_elasticity = 0.1
+        self.max_price_scaling = 1.1
+        self.min_price_scaling = 1.0 / self.max_price_scaling
 
     def get_all_components(self):
         """
@@ -119,7 +128,8 @@ class GenericAgent(Agent):
                 rest_stock = self.get_rest_stock(stock_of_supplier)
                 supplier.provide(recipient=self, component=component, amount=rest_stock)
                 self.reduce_current_demand(supplies=rest_stock, component=component)
-                supplier.register_sales(rest_stock)
+                # Always register the real demand for parts
+                supplier.register_sales(rest_demand)
 
             # Adjust remaining demand and supplier list
             rest_demand = self.demand[component]
@@ -246,7 +256,10 @@ class GenericAgent(Agent):
         noise = self.random.normalvariate(mu=1.0, sigma=0.2)
 
         if prev_year != 0 and prev_prev_year != 0:
-            self.prices[component] = self.prices[component] * prev_year / prev_prev_year * noise
+            price_scaling_factor = noise * min(self.max_price_scaling,
+                                               max(self.min_price_scaling,
+                                                   (prev_year / prev_prev_year) ** self.price_elasticity))
+            self.prices[component] *= price_scaling_factor
         else:
             self.prices[component] = component.get_random_price()
 
@@ -255,16 +268,22 @@ class GenericAgent(Agent):
         Adjust the demand of an agent's component for the next instant.
         :param component: Component
         """
+        self.demand[component] = self.default_demand[component]
+
         prev_year = self.sold_volume['last']
         prev_prev_year = self.sold_volume['second_last']
         noise = self.random.normalvariate(mu=1.0, sigma=0.2)
 
         if prev_year != 0 and prev_prev_year != 0:
-            self.demand[component] = self.demand[component] * prev_year / prev_prev_year * noise
+            demand_scaling_factor = noise * min(self.max_demand_scaling,
+                                                max(self.min_demand_scaling,
+                                                    (prev_year / prev_prev_year) ** self.demand_elasticity))
+            self.demand[component] *= demand_scaling_factor
             if component == Component.PARTS or component == Component.CARS:
                 self.demand[component] = round(self.demand[component])
-        else:
-            self.demand[component] = self.default_demand[component]
+            self.default_demand[component] = self.demand[component]
+        # else:
+        #     self.demand[component] = self.default_demand[component]
 
 
 class PartsManufacturer(GenericAgent):
@@ -292,6 +311,7 @@ class PartsManufacturer(GenericAgent):
         self.default_demand = self.demand.copy()
 
         stock_scaling_factor = 300
+
         self.stock = {
             Component.VIRGIN: init_plastic_ratio[Component.VIRGIN] * stock_scaling_factor,
             Component.RECYCLATE_LOW: init_plastic_ratio[Component.RECYCLATE_LOW] * stock_scaling_factor,
@@ -302,14 +322,76 @@ class PartsManufacturer(GenericAgent):
         self.minimum_requirements = minimal_requirements
         self.plastic_ratio = self.compute_plastic_ratio()
 
+        self.current_year_sales = 0
+
     def process_components(self):
         """
         Manufacture parts out of plastic.
         """
 
         for _ in range(self.demand[Component.PARTS]):
-            new_part = Part(self.plastic_ratio)
-            self.stock[Component.PARTS].append(new_part)
+
+            # Check whether there is enough virgin and high quality plastic in the stock
+            virgin = self.plastic_ratio[Component.VIRGIN]
+            recyclate_high = self.plastic_ratio[Component.RECYCLATE_HIGH]
+            recyclate_low = self.plastic_ratio[Component.RECYCLATE_LOW]
+
+            if virgin <= self.stock[Component.VIRGIN] and recyclate_high <= self.stock[Component.RECYCLATE_HIGH]:
+                excess_high_quality = self.stock[Component.RECYCLATE_HIGH] - recyclate_high
+
+                # Check whether there is enough low and high quality plastic in stock for low quality purposes
+                if recyclate_low <= self.stock[Component.RECYCLATE_LOW] + excess_high_quality:
+
+                    # And check whether there really exists a shortage in low quality plastics and update plastic ratios
+                    if recyclate_low > self.stock[Component.RECYCLATE_LOW]:
+                        low_quality_shortage = recyclate_low - self.stock[Component.RECYCLATE_LOW]
+                        self.plastic_ratio[Component.RECYCLATE_HIGH] += low_quality_shortage
+                        self.plastic_ratio[Component.RECYCLATE_LOW] -= low_quality_shortage
+
+                    # Create new part
+                    self.produce_part()
+
+            elif virgin <= self.stock[Component.VIRGIN] and recyclate_low <= self.stock[Component.RECYCLATE_LOW]:
+                high_quality_shortage = recyclate_high - self.stock[Component.RECYCLATE_HIGH]
+                self.plastic_ratio[Component.VIRGIN] += high_quality_shortage
+                self.plastic_ratio[Component.RECYCLATE_HIGH] -= high_quality_shortage
+
+                # Stop producing parts in case there is not enough virgin plastic to replace recyclate
+                if self.plastic_ratio[Component.VIRGIN] > self.stock[Component.VIRGIN]:
+                    break
+
+                # Create new part
+                self.produce_part()
+
+            elif virgin <= self.stock[Component.VIRGIN]:
+                # Calculate recyclate shortages
+                low_quality_shortage = recyclate_low - self.stock[Component.RECYCLATE_LOW]
+                high_quality_shortage = recyclate_high - self.stock[Component.RECYCLATE_HIGH]
+
+                # And adjust plastic ratios for part accordingly
+                self.plastic_ratio[Component.VIRGIN] = virgin + low_quality_shortage + high_quality_shortage
+                self.plastic_ratio[Component.RECYCLATE_HIGH] = self.stock[Component.RECYCLATE_HIGH]
+                self.plastic_ratio[Component.RECYCLATE_LOW] = self.stock[Component.RECYCLATE_LOW]
+
+                # Stop producing parts in case there is not enough virgin plastic to replace recyclate
+                if self.plastic_ratio[Component.VIRGIN] > self.stock[Component.VIRGIN]:
+                    break
+
+                # Create new part
+                self.produce_part()
+
+            else:
+                # Stop producing parts if there is also not enough virgin plastic
+                break
+
+    def produce_part(self):
+        new_part = Part(self.plastic_ratio)
+        self.stock[Component.PARTS].append(new_part)
+
+        # Remove plastic from stock
+        self.stock[Component.VIRGIN] -= self.plastic_ratio[Component.VIRGIN]
+        self.stock[Component.RECYCLATE_HIGH] -= self.plastic_ratio[Component.RECYCLATE_HIGH]
+        self.stock[Component.RECYCLATE_LOW] -= self.plastic_ratio[Component.RECYCLATE_LOW]
 
     def compute_plastic_ratio(self):
         """
@@ -347,41 +429,93 @@ class PartsManufacturer(GenericAgent):
         refiners = self.all_agents[Refiner]
         recyclers = self.all_agents[Recycler]
 
-        refiners = self.get_sorted_suppliers(suppliers=refiners, component=Component.VIRGIN)
-        self.get_component_from_suppliers(suppliers=refiners, component=Component.VIRGIN)
+        # Saving the low quality recyclate demand and current stock.
+        low_quality_demand = self.demand[Component.RECYCLATE_LOW]
+        saved_low_quality_stock = self.stock[Component.RECYCLATE_LOW]
 
+        # Trying to buy low quality recyclate.
         recyclers_low = self.get_sorted_suppliers(suppliers=recyclers, component=Component.RECYCLATE_LOW)
         self.get_component_from_suppliers(suppliers=recyclers_low, component=Component.RECYCLATE_LOW)
 
+        """
+        If there is a shortage of low quality recyclate, we update the high quality recyclate demand. A higher quality 
+        recyclate can always be used for lower quality purposes.
+        """
+        gathered_low_quality_stock = self.stock[Component.RECYCLATE_LOW] - saved_low_quality_stock
+        low_quality_demand_shortage = max(0.0, low_quality_demand - gathered_low_quality_stock)
+
+        if low_quality_demand_shortage > 0.0:
+            self.demand[Component.RECYCLATE_HIGH] += low_quality_demand_shortage
+
+        # Saving the high quality recyclate demand and current stock.
+        high_quality_demand = self.demand[Component.RECYCLATE_HIGH]
+        saved_high_quality_stock = self.stock[Component.RECYCLATE_HIGH]
+
+        # Trying to buy high quality recyclate.
         recyclers_high = self.get_sorted_suppliers(suppliers=recyclers, component=Component.RECYCLATE_HIGH)
         self.get_component_from_suppliers(suppliers=recyclers_high, component=Component.RECYCLATE_HIGH)
+
+        """
+        If there is a shortage of high and/or low quality recyclate, we update the demand for virgin materials. In case
+        this happens, parts manufacturers will not comply anymore to regulatory standards but do ensure the rigidity
+        of the supply chain.
+        """
+        gathered_high_quality_stock = self.stock[Component.RECYCLATE_HIGH] - saved_high_quality_stock
+        high_quality_demand_shortage = max(0.0, high_quality_demand - gathered_high_quality_stock)
+
+        if high_quality_demand_shortage > 0.0:
+            self.demand[Component.VIRGIN] += high_quality_demand_shortage
+
+        # Buy virgin plastics.
+        refiners = self.get_sorted_suppliers(suppliers=refiners, component=Component.VIRGIN)
+        self.get_component_from_suppliers(suppliers=refiners, component=Component.VIRGIN)
 
     def update(self):
         """
         Update prices and demand for the next instant depending on the sales trend within the last two instants.
         """
+        self.sold_volume['second_last'] = self.sold_volume['last']
+        self.sold_volume['last'] = self.current_year_sales
+        self.current_year_sales = 0
+
         self.adjust_future_prices(component=Component.PARTS)
         self.adjust_future_demand(component=Component.PARTS)
 
     def adjust_future_demand(self, component):
         """
-        Parts manufacturers update their demand for parts and according to their plastic ratios, they update their
+        Parts manufacturers update their demand for parts, and according to their plastic ratios they update their
         demand for raw materials.
+        and that previous previous year does not increase.
         """
         prev_year = self.sold_volume['last']
         prev_prev_year = self.sold_volume['second_last']
-        noise = self.random.normalvariate(mu=1.0, sigma=0.2)
+        noise = self.random.normalvariate(mu=1.0, sigma=0.05)
 
         if prev_year != 0 and prev_prev_year != 0:  # First instant of simulation
-            self.demand[component] = self.demand[component] * prev_year / prev_prev_year * noise
+            demand_scaling_factor = noise * min(self.max_demand_scaling,
+                                                max(self.min_demand_scaling,
+                                                    (prev_year / prev_prev_year) ** self.demand_elasticity))
+
+            self.demand[component] *= demand_scaling_factor
             self.demand[component] = round(self.demand[component])
+
+        elif prev_year != 0 or prev_prev_year != 0:
+            self.demand[component] = sum(self.sold_volume.values())
+
         else:  # All other instants of simulation
             self.demand[component] = self.default_demand[component]
 
+        # Adjust demand for plastic as well
         self.plastic_ratio = self.compute_plastic_ratio()
-
         for plastic_type, ratio in self.plastic_ratio.items():
             self.demand[plastic_type] = ratio * self.demand[Component.PARTS]
+
+    def register_sales(self, sales):
+        """
+        Register the sales of an agent during the current instant. This can then be used later to adjust prices and e.g.
+        production of components.
+        """
+        self.current_year_sales += sales
 
 
 class Refiner(GenericAgent):
@@ -471,12 +605,16 @@ class Recycler(GenericAgent):
         # Reset current_leakage of current instant
         self.current_leakage = 0.0
 
-        # Recycle discarded parts
-        for part in self.stock[Component.PARTS_FOR_RECYCLER]:
+        # Recycle discarded parts and remove from inventory
+        while self.stock[Component.PARTS_FOR_RECYCLER]:
+            part = self.stock[Component.PARTS_FOR_RECYCLER][0]
+            self.stock[Component.PARTS_FOR_RECYCLER] = self.stock[Component.PARTS_FOR_RECYCLER][1:]
             self.recycle_part(part=part)
 
-        # Recycle cars
-        for car in self.stock[Component.CARS_FOR_RECYCLER]:
+        # Recycle cars and remove from inventory
+        while self.stock[Component.CARS_FOR_RECYCLER]:
+            car = self.stock[Component.CARS_FOR_RECYCLER][0]
+            self.stock[Component.CARS_FOR_RECYCLER] = self.stock[Component.CARS_FOR_RECYCLER][1:]
             for part in car.parts:
                 self.recycle_part(part=part)
 
@@ -591,6 +729,7 @@ class CarManufacturer(GenericAgent):
         Update sold volumes.
         Update prices and demand for the next instant depending on the sales trend within the last two instants.
         """
+
         self.sold_volume['second_last'] = self.sold_volume['last']
         self.sold_volume['last'] = self.current_year_sales
 
@@ -612,13 +751,22 @@ class CarManufacturer(GenericAgent):
         Car manufacturers adjust demand differently than other agents, because they supply different components than
         they receive.
         """
-        prev_year = self.sold_volume['last'] * self.nr_of_parts
-        prev_prev_year = self.sold_volume['second_last'] * self.nr_of_parts
+        prev_year = self.sold_volume['last']
+        prev_prev_year = self.sold_volume['second_last']
         noise = self.random.normalvariate(mu=1.0, sigma=0.2)
 
         if prev_year != 0 and prev_prev_year != 0:
-            self.demand[component] = self.demand[component] * prev_year / prev_prev_year * noise
-            self.demand[component] = round(self.demand[component])
+            demand_scaling_factor = (prev_year / prev_prev_year) ** self.demand_elasticity
+            demand_scaling_factor = noise * min(self.max_demand_scaling,
+                                                max(self.min_demand_scaling,
+                                                    demand_scaling_factor))
+            self.demand[Component.CARS] = round(self.demand[Component.CARS] * demand_scaling_factor)
+            self.demand[component] = self.demand[Component.CARS] * self.nr_of_parts
+
+        elif prev_year != 0 or prev_prev_year != 0:
+            sold_last_two_years = sum(self.sold_volume.values())
+            self.demand[Component.CARS] = sold_last_two_years
+            self.demand[component] = self.demand[Component.CARS] * self.nr_of_parts
         else:
             self.demand[component] = self.default_demand[component]
 
@@ -666,12 +814,50 @@ class User(GenericAgent):
                 # Add noise
                 car.max_lifetime *= self.random.normalvariate(1, self.std_use_intensity)
 
+    # def get_component_from_suppliers(self, suppliers, component, amount=None):
+    #     """
+    #     Go through the suppliers and try to buy a specific component.
+    #     Either try to get components in order to cover own demand or to get a specific amount of components.
+    #     :param amount: int
+    #     :param suppliers: list of Agents
+    #     :param component: Component that this agent demands
+    #
+    #     """
+    #
+    #     cheapest_supplier = suppliers[0]
+    #     chosen_supplier = None
+    #
+    #     if amount is None:
+    #         rest_demand = self.demand[component]
+    #     else:
+    #         rest_demand = amount
+    #
+    #     while suppliers:
+    #         supplier = suppliers[0]
+    #         stock_of_supplier = supplier.get_stock()[component]
+    #
+    #         if self.sufficient_stock(rest_demand, stock_of_supplier):
+    #             supplier.provide(recipient=self, component=component, amount=rest_demand)
+    #             supplier.register_sales(rest_demand)
+    #             chosen_supplier = supplier
+    #             break
+    #
+    #         suppliers = suppliers[1:]
+    #
+    #     # If car suppliers have no cars, register that it still wants a car.
+    #     if chosen_supplier is None:
+    #         cheapest_supplier.register_sales(rest_demand)
+
     def bring_car_to_garage(self, car):
         """
         Bring car to garage of choice in case it is broken or total loss. Currently, garage is randomly chosen.
         """
 
-        if car.state == CarState.BROKEN or car.state == CarState.END_OF_LIFE:
+        if car.state == CarState.BROKEN:
+            garage_of_choice = self.select_garage()
+            garage_of_choice.receive_car_from_user(user=self, car=car)
+
+        if car.state == CarState.END_OF_LIFE:
             garage_of_choice = self.select_garage()
             garage_of_choice.receive_car_from_user(user=self, car=car)
 
@@ -707,7 +893,9 @@ class User(GenericAgent):
         if self.stock[Component.CARS]:
             car = self.stock[Component.CARS][0]
             self.bring_car_to_garage(car)
-            car.use_car()
+
+            if self.stock[Component.CARS]:
+                car.use_car()
 
     def update(self):
         """
@@ -825,11 +1013,18 @@ class Garage(GenericAgent):
         Update prices and demand for the next instant depending on the sales trend within the last two instants.
         """
         self.sold_volume['second_last'] = self.sold_volume['last']
-        self.sold_volume['last'] = self.current_year_demand
+        self.sold_volume['last'] = self.demand[Component.PARTS]
 
-        self.adjust_future_prices(component=Component.PARTS)
         self.adjust_future_demand(component=Component.PARTS)
+        self.adjust_future_prices(component=Component.PARTS)
 
+    def adjust_future_demand(self, component):
+        """
+        Garages update their demand differently, because they are conceptually different. Garages anticipate more on
+        cars to be repaired to be able to repair them in the same year. They do so by checking whether they have enough
+        stock to absorb shocks.
+        """
+        self.demand[component] = self.current_year_demand + len(self.stock[Component.CARS])
         self.current_year_demand = 0
 
 
@@ -848,7 +1043,7 @@ class Dismantler(GenericAgent):
 
         self.stock[Component.PARTS] = [Part() for _ in range(100)]
         self.stock[Component.PARTS_FOR_RECYCLER] = [Part(state=PartState.REUSED) for _ in range(100)]
-        self.stock[Component.CARS] = [Car() for _ in range(10)]
+        self.stock[Component.CARS_FOR_DISMANTLER] = [Car() for _ in range(10)]
 
         self.demand[Component.CARS_FOR_DISMANTLER] = math.inf
 
@@ -856,12 +1051,15 @@ class Dismantler(GenericAgent):
 
     def process_components(self):
         """
-        Dismanters dismantle cars into parts as follows:
+        Dismantlers dismantle cars into parts as follows:
             STANDARD -> REUSED
             REUSED -> PARTS_FOR_RECYCLER
         """
+        while self.stock[Component.CARS_FOR_DISMANTLER]:
+            # Remove the car from the inventory
+            car = self.stock[Component.CARS_FOR_DISMANTLER][0]
+            self.stock[Component.CARS_FOR_DISMANTLER] = self.stock[Component.CARS_FOR_DISMANTLER][1:]
 
-        for car in self.stock[Component.CARS]:
             for part in car.parts:
                 if part.state == PartState.STANDARD:
                     part.reuse()
