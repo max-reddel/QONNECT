@@ -14,7 +14,6 @@ class Component(Enum):
     CARS = 6
     CARS_FOR_RECYCLER = 7
     CARS_FOR_DISMANTLER = 8
-    PARTS_TO_REUSE = 9
 
     def get_random_price(self):
         """
