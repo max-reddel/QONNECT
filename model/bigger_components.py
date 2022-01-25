@@ -80,7 +80,6 @@ class Car:
                  nr_of_parts=4,
                  break_down_probability=0.1):
         """
-        TODO: Fill
         :param brand: Brand
         :param lifetime_current:
         :param state:
@@ -137,8 +136,8 @@ class Car:
 
     def use_car(self):  # User calls this function.
         """
-        TODO: Fill
-        :return:
+        The use of a car is aggregated to the probability of breaking down and reaching its end-of-life. Furthermore,
+        its lifetime is increased every year.
         """
         self.to_break_down()
         self.increment_lifetime()

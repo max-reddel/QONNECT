@@ -33,17 +33,19 @@ class CEPAIModel(Model):
 
         super().__init__()
 
+        # TODO: specify value ranges for levers.
         if levers is None:
             self.levers = {
                 "L1": 0.0,  # Minimal requirement for reused parts
                 "L2": 0.0,  # Minimal requirement for high-quality plastic
-                "L3": 1.0,  # Use better solvable cohesives
+                "L3": 1.0,  # Use better solvable adhesives
                 "L4": 1.0,  # Include externality for virgin plastic
                 "L5": 0.0   # Minimal requirement for recyclate
             }
         else:
             self.levers = levers
 
+        # TODO: specify value ranges for uncertainties.
         if uncertainties is None:
             self.uncertainties = {
                 "X1": 1.0,  # Annual increase factor of oil price

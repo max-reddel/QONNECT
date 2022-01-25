@@ -69,7 +69,7 @@ class GenericAgent(Agent):
             Component.RECYCLATE_HIGH: 0.0
         }
 
-        # Track how much was sold last tick and the the tick before that
+        # Track how much was sold last tick and the tick before that
         self.sold_volume = {'last': 0, 'second_last': 0}
 
         # The following numbers have been adjusted
@@ -327,7 +327,8 @@ class PartsManufacturer(GenericAgent):
     def process_components(self):
         """
         Manufacture parts out of plastic.
-        TODO: Does it actually remove materials from the stock when producing parts of resources?
+        TODO: if shortage of low quality recyclate, start using high quality recyclate for producing parts.
+        Thus, also produce the part then with the updates ratios.
         """
 
         for _ in range(self.demand[Component.PARTS]):
@@ -337,18 +338,23 @@ class PartsManufacturer(GenericAgent):
             recyclate_high = self.plastic_ratio[Component.RECYCLATE_HIGH]
             recyclate_low = self.plastic_ratio[Component.RECYCLATE_LOW]
 
-            if (virgin >= self.stock[Component.VIRGIN] and
-                    recyclate_high >= self.stock[Component.RECYCLATE_HIGH] and
-                    recyclate_low >= self.stock[Component.RECYCLATE_LOW]):
+            if virgin <= self.stock[Component.VIRGIN] and recyclate_high <= self.stock[Component.RECYCLATE_HIGH]:
+                excess_high_quality = self.stock[Component.RECYCLATE_HIGH] - recyclate_high
+                if recyclate_low <= self.stock[Component.RECYCLATE_LOW] + excess_high_quality:
+                    if recyclate_low > self.stock[Component.RECYCLATE_LOW]:
+                        low_quality_shortage = recyclate_low - self.stock[Component.RECYCLATE_LOW]
+                        self.plastic_ratio[Component.RECYCLATE_HIGH] += low_quality_shortage
+                        self.plastic_ratio[Component.RECYCLATE_LOW] -= low_quality_shortage
 
-                # Create new part
-                new_part = Part(self.plastic_ratio)
-                self.stock[Component.PARTS].append(new_part)
+                    # Create new part
+                    # TODO: update the plastic ratio in case of low quality shortage
+                    new_part = Part(self.plastic_ratio)
+                    self.stock[Component.PARTS].append(new_part)
 
-                # Remove plastic from stock
-                self.stock[Component.VIRGIN] -= virgin
-                self.stock[Component.RECYCLATE_HIGH] -= recyclate_high
-                self.stock[Component.RECYCLATE_LOW] -= recyclate_low
+                    # Remove plastic from stock
+                    self.stock[Component.VIRGIN] -= virgin
+                    self.stock[Component.RECYCLATE_HIGH] -= recyclate_high
+                    self.stock[Component.RECYCLATE_LOW] -= recyclate_low
 
             else:
                 # Otherwise, stop producing parts
@@ -385,19 +391,54 @@ class PartsManufacturer(GenericAgent):
     def get_all_components(self):
         """
         Determine the order of suppliers by personal preference and then buy components.
+        TODO: currently the supply chain is interrupted because a shortage of low quality recyclate. A lot of material
+        is recycled as high quality. We must change it in such way that high quality can also be used instead of low
+        quality.
         """
 
         refiners = self.all_agents[Refiner]
         recyclers = self.all_agents[Recycler]
 
-        refiners = self.get_sorted_suppliers(suppliers=refiners, component=Component.VIRGIN)
-        self.get_component_from_suppliers(suppliers=refiners, component=Component.VIRGIN)
+        # Saving the low quality recyclate demand and current stock.
+        low_quality_demand = self.demand[Component.RECYCLATE_LOW]
+        saved_low_quality_stock = self.stock[Component.RECYCLATE_LOW]
 
+        # Trying to buy low quality recyclate.
         recyclers_low = self.get_sorted_suppliers(suppliers=recyclers, component=Component.RECYCLATE_LOW)
         self.get_component_from_suppliers(suppliers=recyclers_low, component=Component.RECYCLATE_LOW)
 
+        """
+        If there is a shortage of low quality recyclate, we update the high quality recyclate demand. A higher quality 
+        recyclate can always be used for lower quality purposes.
+        """
+        gathered_low_quality_stock = self.stock[Component.RECYCLATE_LOW] - saved_low_quality_stock
+        low_quality_demand_shortage = max(0.0, low_quality_demand - gathered_low_quality_stock)
+
+        if low_quality_demand_shortage > 0.0:
+            self.demand[Component.RECYCLATE_HIGH] += low_quality_demand_shortage
+
+        # Saving the high quality recyclate demand and current stock.
+        high_quality_demand = self.demand[Component.RECYCLATE_HIGH]
+        saved_high_quality_stock = self.stock[Component.RECYCLATE_HIGH]
+
+        # Trying to buy high quality recyclate.
         recyclers_high = self.get_sorted_suppliers(suppliers=recyclers, component=Component.RECYCLATE_HIGH)
         self.get_component_from_suppliers(suppliers=recyclers_high, component=Component.RECYCLATE_HIGH)
+
+        """
+        If there is a shortage of high and/or low quality recyclate, we update the demand for virgin materials. In case
+        this happens, parts manufacturers will not comply anymore to regulatory standards but do ensure the rigidity
+        of the supply chain.
+        """
+        gathered_high_quality_stock = self.stock[Component.RECYCLATE_HIGH] - saved_high_quality_stock
+        high_quality_demand_shortage = max(0.0, high_quality_demand - gathered_high_quality_stock)
+
+        if high_quality_demand_shortage > 0.0:
+            self.demand[Component.VIRGIN] += high_quality_demand_shortage
+
+        # Buy virgin plastics.
+        refiners = self.get_sorted_suppliers(suppliers=refiners, component=Component.VIRGIN)
+        self.get_component_from_suppliers(suppliers=refiners, component=Component.VIRGIN)
 
     def update(self):
         """
@@ -534,12 +575,16 @@ class Recycler(GenericAgent):
         # Reset current_leakage of current instant
         self.current_leakage = 0.0
 
-        # Recycle discarded parts
-        for part in self.stock[Component.PARTS_FOR_RECYCLER]:
+        # Recycle discarded parts and remove from inventory
+        while self.stock[Component.PARTS_FOR_RECYCLER]:
+            part = self.stock[Component.PARTS_FOR_RECYCLER][0]
+            self.stock[Component.PARTS_FOR_RECYCLER] = self.stock[Component.PARTS_FOR_RECYCLER][1:]
             self.recycle_part(part=part)
 
-        # Recycle cars
+        # Recycle cars and remove from inventory
+        # TODO: write in while loop, otherwise cars are not removed from stock somehow?
         for car in self.stock[Component.CARS_FOR_RECYCLER]:
+            self.stock[Component.CARS_FOR_RECYCLER].remove(car)
             for part in car.parts:
                 self.recycle_part(part=part)
 
@@ -818,7 +863,9 @@ class User(GenericAgent):
         if self.stock[Component.CARS]:
             car = self.stock[Component.CARS][0]
             self.bring_car_to_garage(car)
-            car.use_car()
+
+            if self.stock[Component.CARS]:
+                car.use_car()
 
     def update(self):
         """
@@ -943,9 +990,9 @@ class Garage(GenericAgent):
 
     def adjust_future_demand(self, component):
         """
-        Garages update their demand differently, because they are conceptually different. Garages anticipate more on cars
-        to be repaired to be able to repair them in the same year. They do so by checking whether they have enough stock
-        to absorb shocks.
+        Garages update their demand differently, because they are conceptually different. Garages anticipate more on
+        cars to be repaired to be able to repair them in the same year. They do so by checking whether they have enough
+        stock to absorb shocks.
         """
         self.demand[component] = self.current_year_demand + len(self.stock[Component.CARS])
         self.current_year_demand = 0
