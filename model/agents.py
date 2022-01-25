@@ -327,38 +327,71 @@ class PartsManufacturer(GenericAgent):
     def process_components(self):
         """
         Manufacture parts out of plastic.
-        TODO: if shortage of low quality recyclate, start using high quality recyclate for producing parts.
-        Thus, also produce the part then with the updates ratios.
         """
 
         for _ in range(self.demand[Component.PARTS]):
 
-            # Check whether there is enough plastic in the stock
+            # Check whether there is enough virgin and high quality plastic in the stock
             virgin = self.plastic_ratio[Component.VIRGIN]
             recyclate_high = self.plastic_ratio[Component.RECYCLATE_HIGH]
             recyclate_low = self.plastic_ratio[Component.RECYCLATE_LOW]
 
             if virgin <= self.stock[Component.VIRGIN] and recyclate_high <= self.stock[Component.RECYCLATE_HIGH]:
                 excess_high_quality = self.stock[Component.RECYCLATE_HIGH] - recyclate_high
+
+                # Check whether there is enough low and high quality plastic in stock for low quality purposes
                 if recyclate_low <= self.stock[Component.RECYCLATE_LOW] + excess_high_quality:
+
+                    # And check whether there really exists a shortage in low quality plastics and update plastic ratios
                     if recyclate_low > self.stock[Component.RECYCLATE_LOW]:
                         low_quality_shortage = recyclate_low - self.stock[Component.RECYCLATE_LOW]
                         self.plastic_ratio[Component.RECYCLATE_HIGH] += low_quality_shortage
                         self.plastic_ratio[Component.RECYCLATE_LOW] -= low_quality_shortage
 
                     # Create new part
-                    # TODO: update the plastic ratio in case of low quality shortage
-                    new_part = Part(self.plastic_ratio)
-                    self.stock[Component.PARTS].append(new_part)
+                    self.produce_part()
 
-                    # Remove plastic from stock
-                    self.stock[Component.VIRGIN] -= virgin
-                    self.stock[Component.RECYCLATE_HIGH] -= recyclate_high
-                    self.stock[Component.RECYCLATE_LOW] -= recyclate_low
+            elif virgin <= self.stock[Component.VIRGIN] and recyclate_low <= self.stock[Component.RECYCLATE_LOW]:
+                high_quality_shortage = recyclate_high - self.stock[Component.RECYCLATE_HIGH]
+                self.plastic_ratio[Component.VIRGIN] += high_quality_shortage
+                self.plastic_ratio[Component.RECYCLATE_HIGH] -= high_quality_shortage
+
+                # Stop producing parts in case there is not enough virgin plastic to replace recyclate
+                if self.plastic_ratio[Component.VIRGIN] > self.stock[Component.VIRGIN]:
+                    break
+
+                # Create new part
+                self.produce_part()
+
+            elif virgin <= self.stock[Component.VIRGIN]:
+                # Calculate recyclate shortages
+                low_quality_shortage = recyclate_low - self.stock[Component.RECYCLATE_LOW]
+                high_quality_shortage = recyclate_high - self.stock[Component.RECYCLATE_HIGH]
+
+                # And adjust plastic ratios for part accordingly
+                self.plastic_ratio[Component.VIRGIN] = virgin + low_quality_shortage + high_quality_shortage
+                self.plastic_ratio[Component.RECYCLATE_HIGH] = self.stock[Component.RECYCLATE_HIGH]
+                self.plastic_ratio[Component.RECYCLATE_LOW] = self.stock[Component.RECYCLATE_LOW]
+
+                # Stop producing parts in case there is not enough virgin plastic to replace recyclate
+                if self.plastic_ratio[Component.VIRGIN] > self.stock[Component.VIRGIN]:
+                    break
+
+                # Create new part
+                self.produce_part()
 
             else:
-                # Otherwise, stop producing parts
+                # Stop producing parts if there is also not enough virgin plastic
                 break
+
+    def produce_part(self):
+        new_part = Part(self.plastic_ratio)
+        self.stock[Component.PARTS].append(new_part)
+
+        # Remove plastic from stock
+        self.stock[Component.VIRGIN] -= self.plastic_ratio[Component.VIRGIN]
+        self.stock[Component.RECYCLATE_HIGH] -= self.plastic_ratio[Component.RECYCLATE_HIGH]
+        self.stock[Component.RECYCLATE_LOW] -= self.plastic_ratio[Component.RECYCLATE_LOW]
 
     def compute_plastic_ratio(self):
         """
@@ -391,9 +424,6 @@ class PartsManufacturer(GenericAgent):
     def get_all_components(self):
         """
         Determine the order of suppliers by personal preference and then buy components.
-        TODO: currently the supply chain is interrupted because a shortage of low quality recyclate. A lot of material
-        is recycled as high quality. We must change it in such way that high quality can also be used instead of low
-        quality.
         """
 
         refiners = self.all_agents[Refiner]
