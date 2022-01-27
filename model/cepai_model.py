@@ -87,11 +87,12 @@ class CEPAIModel(Model):
             "price recyclate": self.get_price_of_recyclate
         })
 
-    def run(self, steps=50, time_tracking=False):
+    def run(self, steps=50, time_tracking=False, debug=False):
         """
         Runs the model for a specific amount of steps.
         :param steps: int: number of steps (in years)
         :param time_tracking: Boolean
+        :param debug: Boolean
         :return:
             output: Dataframe: all information that the datacollector gathered
 
@@ -100,7 +101,8 @@ class CEPAIModel(Model):
         start_time = time.time()
 
         for _ in range(steps):
-            print(f'Step: {_}')
+            if debug:
+                print(f'Step: {_}')
             self.step()
 
         if time_tracking:

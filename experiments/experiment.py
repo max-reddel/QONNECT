@@ -99,18 +99,19 @@ class Experiment:
             if idx == 20:
                 break
 
-        self.save_data_to_pickle()
+        self.save_results()
 
-    def save_data_to_pickle(self, folder='./output/'):
+    def save_results(self, folder='./output/'):
         """
         Saves the data of your results in a pickle.
         :param folder:
         """
-        with open(f'{folder}results.pickle', 'wb') as handle:
-            pickle.dump(self.all_results, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        # with open(f'{folder}results.csv', 'w') as handle:
+        data = pd.DataFrame.from_dict(self.all_results)
+        data.to_pickle(f'{folder}results.pickle')
 
     @staticmethod
-    def load_pickled_data(folder='./output/'):
+    def load_results(folder='./output/'):
         """
         Loads the data of two pickles and returns them.
         :param folder:
@@ -118,11 +119,12 @@ class Experiment:
         :return:
             results: dictionary with all results
         """
-        with open(f'{folder}results.pickle', 'rb') as handle:
-            results = pickle.load(handle)
+        # with open(f'{folder}results.csv', 'r') as handle:
+        results = pd.read_pickle(f'{folder}results.pickle')
+
         return results
 
 
 if __name__ == "__main__":
     experiment = Experiment()
-    experiment.run(n_replications=1, steps=2)
+    experiment.run(n_replications=1, steps=1)
