@@ -5,7 +5,9 @@ This module contains the Experiment class with which all experiments can be run.
 from model.cepai_model import *
 import pandas as pd
 import itertools
-import pickle
+import os
+from os import listdir
+from os.path import isfile, join
 
 
 class Experiment:
@@ -56,75 +58,127 @@ class Experiment:
         experimental_conditions = pd.DataFrame(data=rows, columns=columns)
         return experimental_conditions
 
-    def run(self, n_replications=20, steps=50):
+    def run(self, n_replications=20, steps=50, n_segments=1, segment_idx=0):
         """
         This function runs the entire experiment with all its variations.
+        :param n_replications: int: number of replications per condition
+        :param steps: int: length of each run ('years' for which the simulation is run)
+        :param n_segments: into how many segments the experimental conditions should be split (distributed runs)
+        :param segment_idx: which segment (of experimental conditions) should be run
         """
         print('Running the experiment...\n')
 
         self.all_results = {}  # {idx of condition: results_of_a_condition}
 
+        # For distributed computation, select conditions
+        segment_borders = self.get_segment_borders(n_segments, segment_idx)
+
         for idx, row in self.experimental_conditions.iterrows():
 
-            if idx % 10 == 0 and not idx == 0:
-                print(f'Condition #{idx}/{len(self.experimental_conditions)}')
+            if segment_borders[0] <= idx <= segment_borders[1]:
 
-            uncertainties = {
-                'X1': row.loc['X1'],
-                'X2': row.loc['X2'],
-                'X3': row.loc['X3']
-            }
+                if idx % 10 == 0 and not idx == 0:
+                    print(f'Condition #{idx}/{len(self.experimental_conditions)}')
 
-            levers = {
-                'L1': row.loc['L1'],
-                'L2': row.loc['L2'],
-                'L3': row.loc['L3'],
-                'L4': row.loc['L4'],
-                'L5': row.loc['L5'],
-            }
+                uncertainties = {
+                    'X1': row.loc['X1'],
+                    'X2': row.loc['X2'],
+                    'X3': row.loc['X3']
+                }
 
-            # Save all output for one condition
-            results_for_a_condition = {}  # {replication_number: output}
+                levers = {
+                    'L1': row.loc['L1'],
+                    'L2': row.loc['L2'],
+                    'L3': row.loc['L3'],
+                    'L4': row.loc['L4'],
+                    'L5': row.loc['L5']
+                }
 
-            for i in range(n_replications):
+                # Save all output for one condition
+                results_for_a_condition = None
 
-                cepai_model = CEPAIModel(levers=levers, uncertainties=uncertainties)
-                results = cepai_model.run(steps=steps)
-                results_for_a_condition[i+1] = results
+                for i in range(n_replications):
 
-            # Save to all results
-            self.all_results[idx] = results_for_a_condition
+                    cepai_model = CEPAIModel(levers=levers, uncertainties=uncertainties)
+                    results = cepai_model.run(steps=steps)
 
-            # To execute a quick test
-            if idx == 20:
-                break
+                    frames = [results_for_a_condition, results]
+                    results_for_a_condition = pd.concat(frames)
+
+                # Save to all results
+                self.all_results[idx] = results_for_a_condition
 
         self.save_results()
+
+    def get_segment_borders(self, n_segments, segment_idx):
+        """
+        Calculates the border indices of a segment for distributed computation.
+        E.g., if in total, there are 100 conditions and
+            n_segments = 10
+            segment_idx = 4
+            --> borders = (40, 49)
+        :param n_segments: into how many segments the experimental conditions should be split (distributed runs)
+        :param segment_idx: which segment (of experimental conditions) should be run, starting from 0
+        :return: borders: tuple: start and end idx
+        """
+        total_length = len(self.experimental_conditions)
+        segment_length = math.floor(total_length / n_segments)
+        start = segment_length * segment_idx
+        end = start + (segment_length - 1)
+        borders = (start, end)
+
+        return borders
 
     def save_results(self, folder='./output/'):
         """
         Saves the data of your results in a pickle.
-        :param folder:
+        :param folder: string
         """
-        # with open(f'{folder}results.csv', 'w') as handle:
-        data = pd.DataFrame.from_dict(self.all_results)
-        data.to_pickle(f'{folder}results.pickle')
+
+        for condition_idx, df in self.all_results.items():
+            path = f'{folder}condition_{condition_idx}.csv'
+            df.to_csv(path)
 
     @staticmethod
     def load_results(folder='./output/'):
         """
         Loads the data of two pickles and returns them.
-        :param folder:
-
+        :param folder: string
         :return:
             results: dictionary with all results
+        TODO: Load all CSVs and combine them
         """
-        # with open(f'{folder}results.csv', 'r') as handle:
-        results = pd.read_pickle(f'{folder}results.pickle')
+        mypath = os.getcwd() + '/output/'
+        outputs = [f for f in listdir(mypath) if isfile(join(mypath, f))]
 
-        return results
+        all_results = {}
+
+        for condition_output in outputs:
+            path = f'{folder}{condition_output}'
+            df = pd.read_csv(path)
+
+            condition_idx = int(condition_output[10:-4])  # Takes only the number of the condition
+            all_results[condition_idx] = df
+
+        return all_results
 
 
 if __name__ == "__main__":
+    """
+    Remarks on the experiment:
+    - In order to enable distributed computation, we came up with the following.
+    - Each of us runs the experiment with several segment_idx values (0-7).
+          - Anmol:    0 and 1
+          - Felicity: 2 and 3
+          - Max:      4 and 5
+          - Ryan:     6 and 7
+    - All remaining parameters stay constant.
+    - Data will be saved as CSV files into the directory 'experiments/output'.
+    
+    Remarks for later data analysis:
+    - In 'results.ipynb', you can use the load function as shown which loads all CSV files and re-combines them into
+      one dictionary 'all_results'. 
+    """
     experiment = Experiment()
-    experiment.run(n_replications=1, steps=1)
+    # TODO: Adjust segment_idx and run this script twice (once for each of your segment_idx')
+    experiment.run(n_replications=20, steps=50, n_segments=8, segment_idx=0)
