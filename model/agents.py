@@ -316,24 +316,20 @@ class PartsManufacturer(GenericAgent):
         """
         super().__init__(unique_id, model, all_agents)
 
-        init_plastic_ratio = self.compute_plastic_ratio()
-        demand_scaling_factor = 100
         self.demand = {
-            Component.VIRGIN: init_plastic_ratio[Component.VIRGIN] * demand_scaling_factor,
-            Component.RECYCLATE_LOW: init_plastic_ratio[Component.RECYCLATE_LOW] * demand_scaling_factor,
-            Component.RECYCLATE_HIGH: init_plastic_ratio[Component.RECYCLATE_HIGH] * demand_scaling_factor,
-            Component.PARTS: round(self.random.normalvariate(mu=demand_scaling_factor, sigma=10.0))
+            Component.VIRGIN: 70.0,
+            Component.RECYCLATE_LOW: 10.0,
+            Component.RECYCLATE_HIGH: 0.0,
+            Component.PARTS: 70
         }
 
         self.default_demand = self.demand.copy()
 
-        stock_scaling_factor = 300
-
         self.stock = {
-            Component.VIRGIN: init_plastic_ratio[Component.VIRGIN] * stock_scaling_factor,
-            Component.RECYCLATE_LOW: init_plastic_ratio[Component.RECYCLATE_LOW] * stock_scaling_factor,
-            Component.RECYCLATE_HIGH: init_plastic_ratio[Component.RECYCLATE_HIGH] * stock_scaling_factor,
-            Component.PARTS: [Part() for _ in range(stock_scaling_factor)]
+            Component.VIRGIN: 20.0,
+            Component.RECYCLATE_LOW: 10.0,
+            Component.RECYCLATE_HIGH: 10.0,
+            Component.PARTS: [Part() for _ in range(100)]
         }
 
         self.minimum_requirements = minimal_requirements
@@ -442,7 +438,6 @@ class PartsManufacturer(GenericAgent):
         """
         Determine the order of suppliers by personal preference and then buy components. Also check whether it already
         has enough parts in stock.
-        TODO: only do when not enough parts in stock
         """
 
         refiners = self.all_agents[Refiner]
@@ -504,7 +499,6 @@ class PartsManufacturer(GenericAgent):
         """
         Parts manufacturers update their demand for parts, and according to their plastic ratios they update their
         demand for raw materials.
-        TODO: if demand smaller than stock, do nothing
         """
         prev_year = self.sold_volume['last']
         prev_prev_year = self.sold_volume['second_last']
@@ -517,13 +511,13 @@ class PartsManufacturer(GenericAgent):
 
             self.demand[component] *= demand_scaling_factor
             self.demand[component] = round(self.demand[component])
-            self.default_demand[component] = self.demand[component]
 
-        # elif prev_year != 0 or prev_prev_year != 0:
-        #     self.demand[component] = sum(self.sold_volume.values())
-
-        # else:  # All other instants of simulation
-        #     self.demand[component] = self.default_demand[component]
+        # This will be used when an agent starts selling components or stops selling. With the current implementation
+        # demand must stay significant for the model not to crash.
+        elif prev_year != 0 or prev_prev_year != 0:
+            self.demand[component] = max(self.default_demand[component],
+                                         round(sum(self.sold_volume.values()) /
+                                               len(self.all_agents[PartsManufacturer])))
 
         # Adjust demand for plastic as well
         self.plastic_ratio = self.compute_plastic_ratio()
@@ -593,8 +587,8 @@ class Recycler(GenericAgent):
         super().__init__(unique_id, model, all_agents)
 
         self.stock[Component.PARTS_FOR_RECYCLER] = [Part(state=PartState.REUSED) for _ in range(10)]
-        self.stock[Component.RECYCLATE_LOW] = self.random.normalvariate(mu=10.0, sigma=2)
-        self.stock[Component.RECYCLATE_HIGH] = self.random.normalvariate(mu=10.0, sigma=2)
+        self.stock[Component.RECYCLATE_LOW] = self.random.normalvariate(mu=20.0, sigma=2)
+        self.stock[Component.RECYCLATE_HIGH] = self.random.normalvariate(mu=50.0, sigma=2)
         self.stock[Component.CARS_FOR_RECYCLER] = [Car() for _ in range(10)]
 
         self.prices[Component.RECYCLATE_LOW] = self.random.normalvariate(mu=2.5, sigma=0.2)  # cost per unit
@@ -684,7 +678,7 @@ class CarManufacturer(GenericAgent):
     CarManufacturer agent which transforms parts into cars.
     """
 
-    def __init__(self, unique_id, model, all_agents, brand, nr_of_parts=4, break_down_probability=0.1):
+    def __init__(self, unique_id, model, all_agents, brand, car_lifetime=10, nr_of_parts=4, break_down_probability=0.1):
         """
         :param unique_id: int
         :param model: CEPAIModel
@@ -696,15 +690,16 @@ class CarManufacturer(GenericAgent):
         self.nr_of_parts = nr_of_parts
         self.break_down_probability = break_down_probability
 
-        self.stock[Component.PARTS] = [Part() for _ in range(100)]
-        self.stock[Component.CARS] = [Car(self.brand) for _ in range(10)]
+        self.stock[Component.PARTS] = [Part() for _ in range(10)]
+        self.stock[Component.CARS] = [Car(self.brand) for _ in range(20)]
 
         self.prices[Component.CARS] = self.random.normalvariate(mu=1000.0, sigma=0.2)  # cost per unit
 
-        self.demand[Component.PARTS] = round(self.random.normalvariate(mu=100.0, sigma=2))
-        self.demand[Component.CARS] = round(self.random.normalvariate(mu=25.0, sigma=2))  # aim to produce
+        self.demand[Component.PARTS] = round(self.random.normalvariate(mu=50.0, sigma=2))
+        self.demand[Component.CARS] = round(self.random.normalvariate(mu=20.0, sigma=2))  # aim to produce
         self.default_demand[Component.PARTS] = self.demand[Component.PARTS]
-        self.default_demand[Component.CARS] = self.demand[Component.CARS]
+        # Set default demand to be equal to number of users divided by car lifetime
+        self.default_demand[Component.CARS] = 1000 / car_lifetime
 
         self.current_year_sales = 0
 
@@ -785,18 +780,14 @@ class CarManufacturer(GenericAgent):
             demand_scaling_factor = noise * min(self.max_demand_scaling,
                                                 max(self.min_demand_scaling,
                                                     demand_scaling_factor))
-            self.demand[Component.CARS] = round(self.demand[Component.CARS] * demand_scaling_factor)
+            self.demand[Component.CARS] = math.ceil(self.demand[Component.CARS] * demand_scaling_factor)
             self.demand[component] = self.demand[Component.CARS] * self.nr_of_parts
-            self.default_demand[Component.CARS] = self.demand[Component.CARS]
 
         elif prev_year != 0 or prev_prev_year != 0:
-            sold_last_two_years = sum(self.sold_volume.values())
+            sold_last_two_years = max(self.default_demand[component],
+                                      sum(self.sold_volume.values()) / len(self.all_agents[CarManufacturer]))
             self.demand[Component.CARS] = sold_last_two_years
             self.demand[component] = self.demand[Component.CARS] * self.nr_of_parts
-            self.default_demand[component] = self.demand[component]
-
-        # else:
-        #     self.demand[Component.CARS] = self.default_demand[Component.CARS]
 
 
 class User(GenericAgent):
@@ -921,12 +912,12 @@ class Garage(GenericAgent):
         self.circularity_friendliness = circularity_friendliness
 
         self.stock[Component.CARS] = []
-        self.stock[Component.PARTS] = [Part() for _ in range(5)]
-        self.stock[Component.PARTS_FOR_RECYCLER] = []
+        self.stock[Component.PARTS] = [Part() for _ in range(20)]
+        self.stock[Component.PARTS_FOR_RECYCLER] = [Part() for _ in range(10)]
         self.stock[Component.CARS_FOR_RECYCLER] = []
         self.stock[Component.CARS_FOR_DISMANTLER] = []
 
-        self.demand[Component.PARTS] = round(self.random.normalvariate(mu=100.0, sigma=2))
+        self.demand[Component.PARTS] = round(self.random.normalvariate(mu=60.0, sigma=2))
         self.default_demand[Component.PARTS] = self.demand[Component.PARTS]
 
         self.min_reused_parts = min_reused_parts
@@ -1035,8 +1026,8 @@ class Dismantler(GenericAgent):
          """
         super().__init__(unique_id, model, all_agents)
 
-        self.stock[Component.PARTS] = [Part() for _ in range(100)]
-        self.stock[Component.PARTS_FOR_RECYCLER] = [Part(state=PartState.REUSED) for _ in range(100)]
+        self.stock[Component.PARTS] = [Part() for _ in range(40)]
+        self.stock[Component.PARTS_FOR_RECYCLER] = [Part(state=PartState.REUSED) for _ in range(10)]
         self.stock[Component.CARS_FOR_DISMANTLER] = [Car() for _ in range(10)]
 
         self.demand[Component.CARS_FOR_DISMANTLER] = math.inf

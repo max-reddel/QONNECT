@@ -75,6 +75,7 @@ class Car:
     def __init__(self,
                  brand=None,
                  lifetime_current=0,
+                 max_lifetime=10,
                  state=CarState.FUNCTIONING,
                  parts=None,
                  nr_of_parts=4,
@@ -93,7 +94,7 @@ class Car:
             parts = [Part() for _ in range(nr_of_parts)]
 
         self.lifetime_current = lifetime_current
-        self.max_lifetime = 10
+        self.max_lifetime = max_lifetime
         self.state = state
         if brand is None:
             self.brand = Brand.get_random()

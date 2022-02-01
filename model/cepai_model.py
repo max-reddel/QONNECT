@@ -20,6 +20,7 @@ class CEPAIModel(Model):
                  agent_counts=None,
                  nr_of_parts=4,
                  break_down_probability=0.3,
+                 car_lifetime=10,
                  std_use_intensity=0.1):
         """
         :param levers: dictionary with {"Name": float}
@@ -57,6 +58,7 @@ class CEPAIModel(Model):
 
         self.brands = {brand: False for brand in Brand}
         self.nr_of_parts = nr_of_parts
+        self.car_lifetime = car_lifetime
         self.break_down_probability = break_down_probability
         self.std_use_intensity = std_use_intensity
 
@@ -87,7 +89,7 @@ class CEPAIModel(Model):
             "price recyclate": self.get_price_of_recyclate
         })
 
-    def run(self, steps=50, time_tracking=False, debug=True):
+    def run(self, steps=50, time_tracking=False, debug=False):
         """
         Runs the model for a specific amount of steps.
         :param steps: int: number of steps (in years)
@@ -142,7 +144,11 @@ class CEPAIModel(Model):
                     list(CarState)[:2],
                     weights=[self.break_down_probability, 1 - self.break_down_probability])[0]
 
-            car = Car(brand=brand, lifetime_current=lifetime_current, state=state, parts=parts)
+            car = Car(brand=brand,
+                      lifetime_current=lifetime_current,
+                      max_lifetime=self.car_lifetime,
+                      state=state,
+                      parts=parts)
         return car
 
     def create_all_agents(self):
@@ -155,7 +161,10 @@ class CEPAIModel(Model):
         for agent_type, agent_count in self.agent_counts.items():
             for _ in range(agent_count):
 
-                if agent_type is Refiner:
+                if agent_type is User:
+                    new_agent = self.create_user(all_agents)
+
+                elif agent_type is Refiner:
                     externality_factor = self.levers["L4"]
                     shock_probability = self.uncertainties["X2"]
                     annual_price_increase = self.uncertainties["X1"]
@@ -170,10 +179,8 @@ class CEPAIModel(Model):
                     new_agent = agent_type(self.next_id(), self, all_agents, minimal_requirements)
 
                 elif agent_type is CarManufacturer:
-                    new_agent = agent_type(self.next_id(), self, all_agents, self.get_next_brand(), self.nr_of_parts,
-                                           self.break_down_probability)
-                elif agent_type is User:
-                    new_agent = self.create_user(all_agents)
+                    new_agent = agent_type(self.next_id(), self, all_agents, self.get_next_brand(), self.car_lifetime,
+                                           self.nr_of_parts, self.break_down_probability)
 
                 elif agent_type is Garage:
                     minimal_requirement = self.levers["L1"]
@@ -187,7 +194,7 @@ class CEPAIModel(Model):
 
                 else:
                     """
-                    With the current model, in which garages receive cars and repair them in the same tick, I didn't
+                    With the current model, in which garages receive cars and repair them in the same tick, we don't
                     think it would make any sense to initialise garages with cars of users. This would simply mean
                     that there is initially a parts shortage. Not implementing this setup, also means a less 
                     complicated setup procedure.
@@ -216,7 +223,7 @@ class CEPAIModel(Model):
 
             if use_intensity > 0.0:
                 car.max_lifetime = round(
-                    car.max_lifetime / use_intensity)  # NOTE: Check whether resulting max_lifetime values make sense
+                    car.max_lifetime / use_intensity)
 
                 if car.max_lifetime <= car.lifetime_current:
                     car.lifetime_current = car.max_lifetime
