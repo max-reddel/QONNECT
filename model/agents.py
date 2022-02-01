@@ -73,8 +73,8 @@ class GenericAgent(Agent):
         self.sold_volume = {'last': 0, 'second_last': 0}
 
         # The following numbers have been adjusted
-        self.demand_elasticity = 0.2  # earlier: 0.5
-        self.max_demand_scaling = 1.2  # earlier: 2.0
+        self.demand_elasticity = 0.5  # earlier: 0.5
+        self.max_demand_scaling = 2.0  # earlier: 2.0
         self.min_demand_scaling = 1.0 / self.max_demand_scaling
 
         self.price_elasticity = 0.1
@@ -111,29 +111,42 @@ class GenericAgent(Agent):
         :param component: Component that this agent demands
         """
 
-        if amount is None:
-            rest_demand = self.demand[component]
-        else:
-            rest_demand = amount
+        # Check whether agent already has enough in stock
+        enough_in_stock = False
 
-        while suppliers and rest_demand > 0.0:
-            supplier = suppliers[0]
-            stock_of_supplier = supplier.get_stock()[component]
+        if isinstance(self.stock[component], float or int):
+            if self.demand[component] <= self.stock[component]:
+                enough_in_stock = True
 
-            if self.sufficient_stock(rest_demand, stock_of_supplier):
-                supplier.provide(recipient=self, component=component, amount=rest_demand)
-                self.reduce_current_demand(supplies=rest_demand, component=component)
-                supplier.register_sales(rest_demand)
+        elif isinstance(self.stock[component], list):
+            if self.demand[component] <= len(self.stock[component]):
+                enough_in_stock = True
+
+        if not enough_in_stock:
+
+            if amount is None:
+                rest_demand = self.demand[component]
             else:
-                rest_stock = self.get_rest_stock(stock_of_supplier)
-                supplier.provide(recipient=self, component=component, amount=rest_stock)
-                self.reduce_current_demand(supplies=rest_stock, component=component)
-                # Always register the real demand for parts
-                supplier.register_sales(rest_demand)
+                rest_demand = amount
 
-            # Adjust remaining demand and supplier list
-            rest_demand = self.demand[component]
-            suppliers = suppliers[1:]
+            while suppliers and rest_demand > 0.0:
+                supplier = suppliers[0]
+                stock_of_supplier = supplier.get_stock()[component]
+
+                if self.sufficient_stock(rest_demand, stock_of_supplier):
+                    supplier.provide(recipient=self, component=component, amount=rest_demand)
+                    self.reduce_current_demand(supplies=rest_demand, component=component)
+                    supplier.register_sales(rest_demand)
+                else:
+                    rest_stock = self.get_rest_stock(stock_of_supplier)
+                    supplier.provide(recipient=self, component=component, amount=rest_stock)
+                    self.reduce_current_demand(supplies=rest_stock, component=component)
+                    # Always register the real demand for parts
+                    supplier.register_sales(rest_demand)
+
+                # Adjust remaining demand and supplier list
+                rest_demand = self.demand[component]
+                suppliers = suppliers[1:]
 
     def reduce_current_demand(self, supplies, component):
         """
@@ -282,8 +295,12 @@ class GenericAgent(Agent):
             if component == Component.PARTS or component == Component.CARS:
                 self.demand[component] = round(self.demand[component])
             self.default_demand[component] = self.demand[component]
-        # else:
-        #     self.demand[component] = self.default_demand[component]
+
+        elif prev_year != 0 or prev_prev_year != 0:
+            self.demand[component] = sum(self.sold_volume.values())
+
+        else:  # All other instants of simulation
+            self.demand[component] = self.default_demand[component]
 
 
 class PartsManufacturer(GenericAgent):
@@ -423,7 +440,9 @@ class PartsManufacturer(GenericAgent):
 
     def get_all_components(self):
         """
-        Determine the order of suppliers by personal preference and then buy components.
+        Determine the order of suppliers by personal preference and then buy components. Also check whether it already
+        has enough parts in stock.
+        TODO: only do when not enough parts in stock
         """
 
         refiners = self.all_agents[Refiner]
@@ -438,8 +457,8 @@ class PartsManufacturer(GenericAgent):
         self.get_component_from_suppliers(suppliers=recyclers_low, component=Component.RECYCLATE_LOW)
 
         """
-        If there is a shortage of low quality recyclate, we update the high quality recyclate demand. A higher quality 
-        recyclate can always be used for lower quality purposes.
+        If there is a shortage of low quality recyclate, we update the high quality recyclate demand. A higher
+        quality recyclate can always be used for lower quality purposes.
         """
         gathered_low_quality_stock = self.stock[Component.RECYCLATE_LOW] - saved_low_quality_stock
         low_quality_demand_shortage = max(0.0, low_quality_demand - gathered_low_quality_stock)
@@ -456,9 +475,9 @@ class PartsManufacturer(GenericAgent):
         self.get_component_from_suppliers(suppliers=recyclers_high, component=Component.RECYCLATE_HIGH)
 
         """
-        If there is a shortage of high and/or low quality recyclate, we update the demand for virgin materials. In case
-        this happens, parts manufacturers will not comply anymore to regulatory standards but do ensure the rigidity
-        of the supply chain.
+        If there is a shortage of high and/or low quality recyclate, we update the demand for virgin materials. In 
+        case this happens, parts manufacturers will not comply anymore to regulatory standards but do ensure the 
+        rigidity of the supply chain.
         """
         gathered_high_quality_stock = self.stock[Component.RECYCLATE_HIGH] - saved_high_quality_stock
         high_quality_demand_shortage = max(0.0, high_quality_demand - gathered_high_quality_stock)
@@ -485,7 +504,7 @@ class PartsManufacturer(GenericAgent):
         """
         Parts manufacturers update their demand for parts, and according to their plastic ratios they update their
         demand for raw materials.
-        and that previous previous year does not increase.
+        TODO: if demand smaller than stock, do nothing
         """
         prev_year = self.sold_volume['last']
         prev_prev_year = self.sold_volume['second_last']
@@ -498,12 +517,13 @@ class PartsManufacturer(GenericAgent):
 
             self.demand[component] *= demand_scaling_factor
             self.demand[component] = round(self.demand[component])
+            self.default_demand[component] = self.demand[component]
 
-        elif prev_year != 0 or prev_prev_year != 0:
-            self.demand[component] = sum(self.sold_volume.values())
+        # elif prev_year != 0 or prev_prev_year != 0:
+        #     self.demand[component] = sum(self.sold_volume.values())
 
-        else:  # All other instants of simulation
-            self.demand[component] = self.default_demand[component]
+        # else:  # All other instants of simulation
+        #     self.demand[component] = self.default_demand[component]
 
         # Adjust demand for plastic as well
         self.plastic_ratio = self.compute_plastic_ratio()
@@ -682,25 +702,29 @@ class CarManufacturer(GenericAgent):
         self.prices[Component.CARS] = self.random.normalvariate(mu=1000.0, sigma=0.2)  # cost per unit
 
         self.demand[Component.PARTS] = round(self.random.normalvariate(mu=100.0, sigma=2))
-        self.demand[Component.CARS] = round(self.random.normalvariate(mu=10.0, sigma=2))  # aim to produce
+        self.demand[Component.CARS] = round(self.random.normalvariate(mu=25.0, sigma=2))  # aim to produce
         self.default_demand[Component.PARTS] = self.demand[Component.PARTS]
+        self.default_demand[Component.CARS] = self.demand[Component.CARS]
 
         self.current_year_sales = 0
 
     def get_all_components(self):
         """
-        Determine the order of suppliers by personal preference and then buy components.
+        Determine the order of suppliers by personal preference and then buy components. Also check whether it already
+        has enough cars in stock.
         """
-        # Suppliers
-        parts_manufacturers = self.all_agents[PartsManufacturer]
-        parts_manufacturers = self.get_sorted_suppliers(suppliers=parts_manufacturers, component=Component.PARTS)
-        self.get_component_from_suppliers(suppliers=parts_manufacturers, component=Component.PARTS)
+        # Check for enough cars and parts in stock
+        car_stock = len(self.stock[Component.CARS])
+        cars_in_parts_stock = len(self.stock[Component.PARTS]) / self.nr_of_parts
+        if self.demand[Component.CARS] > car_stock + cars_in_parts_stock:
+
+            # Suppliers
+            parts_manufacturers = self.all_agents[PartsManufacturer]
+            parts_manufacturers = self.get_sorted_suppliers(suppliers=parts_manufacturers, component=Component.PARTS)
+            self.get_component_from_suppliers(suppliers=parts_manufacturers, component=Component.PARTS)
 
     def process_components(self):
-        """
-        Manufacture specific amount of cars.
-        """
-        for _ in range(self.demand[Component.CARS]):
+        while self.stock[Component.PARTS]:
             parts = self.get_next_parts(nr_of_parts=self.nr_of_parts)
             if not parts:
                 break
@@ -719,6 +743,7 @@ class CarManufacturer(GenericAgent):
 
         if len(all_parts) >= nr_of_parts:
             next_parts = all_parts[:nr_of_parts]
+            self.stock[Component.PARTS] = self.stock[Component.PARTS][nr_of_parts:]
         else:
             next_parts = []
 
@@ -762,13 +787,16 @@ class CarManufacturer(GenericAgent):
                                                     demand_scaling_factor))
             self.demand[Component.CARS] = round(self.demand[Component.CARS] * demand_scaling_factor)
             self.demand[component] = self.demand[Component.CARS] * self.nr_of_parts
+            self.default_demand[Component.CARS] = self.demand[Component.CARS]
 
         elif prev_year != 0 or prev_prev_year != 0:
             sold_last_two_years = sum(self.sold_volume.values())
             self.demand[Component.CARS] = sold_last_two_years
             self.demand[component] = self.demand[Component.CARS] * self.nr_of_parts
-        else:
-            self.demand[component] = self.default_demand[component]
+            self.default_demand[component] = self.demand[component]
+
+        # else:
+        #     self.demand[Component.CARS] = self.default_demand[Component.CARS]
 
 
 class User(GenericAgent):
@@ -813,40 +841,6 @@ class User(GenericAgent):
                 car = self.stock[Component.CARS][0]
                 # Add noise
                 car.max_lifetime *= self.random.normalvariate(1, self.std_use_intensity)
-
-    # def get_component_from_suppliers(self, suppliers, component, amount=None):
-    #     """
-    #     Go through the suppliers and try to buy a specific component.
-    #     Either try to get components in order to cover own demand or to get a specific amount of components.
-    #     :param amount: int
-    #     :param suppliers: list of Agents
-    #     :param component: Component that this agent demands
-    #
-    #     """
-    #
-    #     cheapest_supplier = suppliers[0]
-    #     chosen_supplier = None
-    #
-    #     if amount is None:
-    #         rest_demand = self.demand[component]
-    #     else:
-    #         rest_demand = amount
-    #
-    #     while suppliers:
-    #         supplier = suppliers[0]
-    #         stock_of_supplier = supplier.get_stock()[component]
-    #
-    #         if self.sufficient_stock(rest_demand, stock_of_supplier):
-    #             supplier.provide(recipient=self, component=component, amount=rest_demand)
-    #             supplier.register_sales(rest_demand)
-    #             chosen_supplier = supplier
-    #             break
-    #
-    #         suppliers = suppliers[1:]
-    #
-    #     # If car suppliers have no cars, register that it still wants a car.
-    #     if chosen_supplier is None:
-    #         cheapest_supplier.register_sales(rest_demand)
 
     def bring_car_to_garage(self, car):
         """

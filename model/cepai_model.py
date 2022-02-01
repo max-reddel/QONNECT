@@ -87,7 +87,7 @@ class CEPAIModel(Model):
             "price recyclate": self.get_price_of_recyclate
         })
 
-    def run(self, steps=50, time_tracking=False, debug=False):
+    def run(self, steps=50, time_tracking=False, debug=True):
         """
         Runs the model for a specific amount of steps.
         :param steps: int: number of steps (in years)
