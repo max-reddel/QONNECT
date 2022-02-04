@@ -34,7 +34,6 @@ class CEPAIModel(Model):
 
         super().__init__()
 
-        # TODO: specify value ranges for levers.
         if levers is None:
             self.levers = {
                 "L1": 0.0,  # Minimal requirement for reused parts
@@ -46,7 +45,6 @@ class CEPAIModel(Model):
         else:
             self.levers = levers
 
-        # TODO: specify value ranges for uncertainties.
         if uncertainties is None:
             self.uncertainties = {
                 "X1": 1.0,  # Annual increase factor of oil price
@@ -122,21 +120,22 @@ class CEPAIModel(Model):
                 self.brands[car_manufacturer] = True
                 return car_manufacturer
 
-    def get_car(self, lifetime_vehicle=10):
+    def get_car(self, lifetime_vehicle=10, ratio_initial_cars=0.95):
         """
         To setup users with cars initially. If the lifetime of the assigned car is zero, it means that the user will
         buy a new car in the first tick. Else its car is assigned a random brand, state, current lifetime and parts.
         :param lifetime_vehicle: int
+        :param ratio_initial_cars: float
         :return: car: Car
         """
-        brand = self.random.choice(list(Brand))
-        lifetime_current = random.randint(0, lifetime_vehicle)
-        part_states = self.random.choices(list(PartState), weights=(1, 9), k=self.nr_of_parts)
-        parts = [Part(state=state) for state in part_states]
-
-        if lifetime_current == 0:
+        if self.random.random() > ratio_initial_cars:
             car = None
         else:
+            brand = self.random.choice(list(Brand))
+            lifetime_current = random.randint(0, lifetime_vehicle)
+            part_states = self.random.choices(list(PartState), weights=(9, 1), k=self.nr_of_parts)
+            parts = [Part(state=state) for state in part_states]
+
             if lifetime_current == lifetime_vehicle:
                 state = CarState.FUNCTIONING
             else:
