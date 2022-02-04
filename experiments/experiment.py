@@ -8,6 +8,7 @@ import itertools
 import os
 from os import listdir
 from os.path import isfile, join
+import time
 
 
 class Experiment:
@@ -187,6 +188,11 @@ if __name__ == "__main__":
     - In 'results.ipynb', you can use the load function as shown which loads all CSV files and re-combines them into
       one dictionary 'all_results'. 
     """
+    start_time = time.time()
+
     experiment = Experiment()
     # TODO: Adjust segment_idx and run this script twice (once for each of your segment_idx')
-    experiment.run(n_replications=20, steps=50, n_segments=8, segment_idx=0)
+    experiment.run(n_replications=20, steps=50, n_segments=8, segment_idx=4)
+
+    run_time = round(time.time() - start_time, 2)
+    print(f'Run time: {run_time} seconds')
