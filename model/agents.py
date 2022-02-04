@@ -894,7 +894,8 @@ class Garage(GenericAgent):
     Garages repair cars, and send ELVs to dismantlers or recyclers.
     """
 
-    def __init__(self, unique_id, model, all_agents, circularity_friendliness=0.2, min_reused_parts=0.0):
+    def __init__(self, unique_id, model, all_agents, customer_base=None, circularity_friendliness=0.2,
+                 min_reused_parts=0.0):
         """
          :param circularity_friendliness:
          :param min_reused_parts: float
@@ -908,10 +909,14 @@ class Garage(GenericAgent):
         To keep track of which user a car belongs to, a garage has a dictionary with a certain car in their possession 
         as key and the corresponding user as value. This ensures giving cars back to the rightful owner.
         """
-        self.customer_base = {}
+        if customer_base is None:
+            self.customer_base = {}
+        else:
+            self.customer_base = customer_base
+
         self.circularity_friendliness = circularity_friendliness
 
-        self.stock[Component.CARS] = []
+        self.stock[Component.CARS] = [car for car in customer_base.keys()]
         self.stock[Component.PARTS] = [Part() for _ in range(20)]
         self.stock[Component.PARTS_FOR_RECYCLER] = [Part() for _ in range(10)]
         self.stock[Component.CARS_FOR_RECYCLER] = []
