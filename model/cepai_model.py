@@ -31,7 +31,7 @@ class CEPAIModel(Model):
         :param break_down_probability: float: probability of a car breaking down at any given year
         :param std_use_intensity: float: standard value of how intensely a user uses a car
         """
-        print('Simulation starting...')
+        # print('Simulation starting...')
 
         super().__init__()
 

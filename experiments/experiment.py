@@ -73,12 +73,18 @@ class Experiment:
         # For distributed computation, select conditions
         segment_borders = self.get_segment_borders(n_segments, segment_idx)
 
+        # For printing
+        total_length = len(self.experimental_conditions)
+        segment_length = math.floor(total_length / n_segments)
+        condition_idx = 1
+
         for idx, row in self.experimental_conditions.iterrows():
 
             if segment_borders[0] <= idx <= segment_borders[1]:
 
-                if idx % 10 == 0 and not idx == 0:
-                    print(f'Condition #{idx}/{len(self.experimental_conditions)}')
+                if condition_idx % 5 == 0:
+                    print(f'Running experimental condition #{condition_idx}/{segment_length}')
+                condition_idx += 1
 
                 uncertainties = {
                     'X1': row.loc['X1'],
@@ -109,6 +115,8 @@ class Experiment:
                 self.all_results[idx] = results_for_a_condition
 
         self.save_results()
+        # print(f'Running experimental condition #{segment_length}/{segment_length}')
+        print('\nExperiment completed!')
 
     def get_segment_borders(self, n_segments, segment_idx):
         """
