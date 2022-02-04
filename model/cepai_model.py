@@ -20,6 +20,7 @@ class CEPAIModel(Model):
                  agent_counts=None,
                  nr_of_parts=4,
                  break_down_probability=0.3,
+                 initial_fraction_in_garage=0.0,
                  car_lifetime=10,
                  std_use_intensity=0.1):
         """
@@ -34,7 +35,6 @@ class CEPAIModel(Model):
 
         super().__init__()
 
-        # TODO: specify value ranges for levers.
         if levers is None:
             self.levers = {
                 "L1": 0.0,  # Minimal requirement for reused parts
@@ -46,7 +46,6 @@ class CEPAIModel(Model):
         else:
             self.levers = levers
 
-        # TODO: specify value ranges for uncertainties.
         if uncertainties is None:
             self.uncertainties = {
                 "X1": 1.0,  # Annual increase factor of oil price
@@ -60,6 +59,7 @@ class CEPAIModel(Model):
         self.nr_of_parts = nr_of_parts
         self.car_lifetime = car_lifetime
         self.break_down_probability = break_down_probability
+        self.init_in_garage = initial_fraction_in_garage
         self.std_use_intensity = std_use_intensity
 
         if agent_counts is None:
@@ -84,6 +84,7 @@ class CEPAIModel(Model):
             "amount recyclate low": self.get_amount_recyclate_low,
             "amount reused parts": self.get_amount_reused_parts,
             "amount standard parts": self.get_amount_standard_parts,
+            "cars in garage": self.get_cars_in_repair,
             "amount leakage": self.get_amount_of_leakage,
             "price virgin": self.get_price_of_virgin,
             "price recyclate": self.get_price_of_recyclate
@@ -122,21 +123,22 @@ class CEPAIModel(Model):
                 self.brands[car_manufacturer] = True
                 return car_manufacturer
 
-    def get_car(self, lifetime_vehicle=10):
+    def get_car(self, lifetime_vehicle=10, ratio_initial_cars=0.95):
         """
         To setup users with cars initially. If the lifetime of the assigned car is zero, it means that the user will
         buy a new car in the first tick. Else its car is assigned a random brand, state, current lifetime and parts.
         :param lifetime_vehicle: int
+        :param ratio_initial_cars: float
         :return: car: Car
         """
-        brand = self.random.choice(list(Brand))
-        lifetime_current = random.randint(0, lifetime_vehicle)
-        part_states = self.random.choices(list(PartState), weights=(1, 9), k=self.nr_of_parts)
-        parts = [Part(state=state) for state in part_states]
-
-        if lifetime_current == 0:
+        if self.random.random() > ratio_initial_cars:
             car = None
         else:
+            brand = self.random.choice(list(Brand))
+            lifetime_current = random.randint(0, lifetime_vehicle)
+            part_states = self.random.choices(list(PartState), weights=(12, 1), k=self.nr_of_parts)
+            parts = [Part(state=state) for state in part_states]
+
             if lifetime_current == lifetime_vehicle:
                 state = CarState.FUNCTIONING
             else:
@@ -158,11 +160,14 @@ class CEPAIModel(Model):
             all_agents: dictionary with {Agent: list with this kind of Agents}
         """
         all_agents = {}
+        # To keep track of cars which are broken
+        cars_tb_repaired = {}
         for agent_type, agent_count in self.agent_counts.items():
             for _ in range(agent_count):
 
                 if agent_type is User:
-                    new_agent = self.create_user(all_agents)
+                    new_agent, customer_base = self.create_user(all_agents)
+                    cars_tb_repaired.update(customer_base)
 
                 elif agent_type is Refiner:
                     externality_factor = self.levers["L4"]
@@ -184,7 +189,10 @@ class CEPAIModel(Model):
 
                 elif agent_type is Garage:
                     minimal_requirement = self.levers["L1"]
-                    new_agent = agent_type(self.next_id(), self, all_agents, min_reused_parts=minimal_requirement)
+                    n_cars = round(len(cars_tb_repaired) / (agent_count - _))
+                    cars_for_repair = {car: cars_tb_repaired[car] for car in list(cars_tb_repaired)[:n_cars]}
+                    new_agent = agent_type(self.next_id(), self, all_agents, customer_base=cars_for_repair,
+                                           min_reused_parts=minimal_requirement)
 
                 elif agent_type is Recycler:
                     cohesive_factor = self.levers["L3"]
@@ -193,12 +201,6 @@ class CEPAIModel(Model):
                                            cohesive_factor)
 
                 else:
-                    """
-                    With the current model, in which garages receive cars and repair them in the same tick, we don't
-                    think it would make any sense to initialise garages with cars of users. This would simply mean
-                    that there is initially a parts shortage. Not implementing this setup, also means a less 
-                    complicated setup procedure.
-                    """
                     new_agent = agent_type(self.next_id(), self, all_agents)
 
                 self.schedule.add(new_agent)
@@ -215,6 +217,7 @@ class CEPAIModel(Model):
         :return: new_agent: Agent
         """
         new_agent = User(self.next_id(), self, all_agents, self.get_car(), self.std_use_intensity)
+        customer_base = {}
         if new_agent.stock[Component.CARS]:
             new_agent.demand[Component.CARS] = 0
             car = new_agent.stock[Component.CARS][0]
@@ -228,7 +231,13 @@ class CEPAIModel(Model):
                 if car.max_lifetime <= car.lifetime_current:
                     car.lifetime_current = car.max_lifetime
 
-        return new_agent
+            # Setting up broken cars.
+            if (car.lifetime_current < car.max_lifetime) and (self.random.random() < self.init_in_garage):
+                new_agent.stock[Component.CARS] = []
+                car.state = CarState.BROKEN
+                customer_base[car] = new_agent
+
+        return new_agent, customer_base
 
     def step(self):
         """
@@ -309,6 +318,7 @@ class CEPAIModel(Model):
             amount: int
         """
         users = self.all_agents[User]
+        garages = self.all_agents[Garage]
         amount = 0
 
         for user in users:
@@ -318,6 +328,14 @@ class CEPAIModel(Model):
                 for part in parts:
                     if part.state == part_state:
                         amount += 1
+
+        for garage in garages:
+            if garage.stock[Component.CARS]:
+                for car in garage.stock[Component.CARS]:
+                    parts = car.parts
+                    for part in parts:
+                        if part.state == part_state:
+                            amount += 1
 
         return amount
 
@@ -367,3 +385,18 @@ class CEPAIModel(Model):
 
         price = sum(prices) / len(prices)
         return price
+
+    def get_cars_in_repair(self):
+        """
+        Get the number of cars that are in repair in garages.
+        :return:
+            amount: int
+        """
+        garages = self.all_agents[Garage]
+        amount = 0
+
+        for garage in garages:
+            if garage.stock[Component.CARS]:
+                amount += len(garage.stock[Component.CARS])
+
+        return amount

@@ -22,8 +22,8 @@ class Part:
         """
 
         self.minimum_requirements = {
-            Component.RECYCLATE_LOW: 0.2,
-            Component.RECYCLATE_HIGH: 0.2}
+            Component.RECYCLATE_LOW: 0.0,
+            Component.RECYCLATE_HIGH: 0.05}
 
         if plastic_ratio is None:
             self.init_plastic_ratio()
@@ -110,6 +110,7 @@ class Car:
         """
 
         if part.state == PartState.REUSED:
+            self.parts = self.parts[1:]
             idx = random.randint(0, len(self.parts) - 1)
             self.parts.insert(idx, part)
         else:

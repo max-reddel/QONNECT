@@ -317,10 +317,10 @@ class PartsManufacturer(GenericAgent):
         super().__init__(unique_id, model, all_agents)
 
         self.demand = {
-            Component.VIRGIN: 70.0,
+            Component.VIRGIN: 95.0,
             Component.RECYCLATE_LOW: 10.0,
             Component.RECYCLATE_HIGH: 0.0,
-            Component.PARTS: 70
+            Component.PARTS: 100
         }
 
         self.default_demand = self.demand.copy()
@@ -329,7 +329,7 @@ class PartsManufacturer(GenericAgent):
             Component.VIRGIN: 20.0,
             Component.RECYCLATE_LOW: 10.0,
             Component.RECYCLATE_HIGH: 10.0,
-            Component.PARTS: [Part() for _ in range(100)]
+            Component.PARTS: [Part() for _ in range(150)]
         }
 
         self.minimum_requirements = minimal_requirements
@@ -562,7 +562,7 @@ class Refiner(GenericAgent):
         self.adjust_future_prices(component=Component.VIRGIN)
 
         # Annual adjustment of price due to global oil drying up
-        self.prices[Component.VIRGIN] *= self.annual_price_increase  # Remark: compounding price increase
+        self.prices[Component.VIRGIN] += self.annual_price_increase  # Remark: compounding price increase
 
         # Adjustment in case of a oil price shock
         shock_factor = 1.5
@@ -691,12 +691,12 @@ class CarManufacturer(GenericAgent):
         self.break_down_probability = break_down_probability
 
         self.stock[Component.PARTS] = [Part() for _ in range(10)]
-        self.stock[Component.CARS] = [Car(self.brand) for _ in range(20)]
+        self.stock[Component.CARS] = [Car(self.brand) for _ in range(60)]
 
         self.prices[Component.CARS] = self.random.normalvariate(mu=1000.0, sigma=0.2)  # cost per unit
 
-        self.demand[Component.PARTS] = round(self.random.normalvariate(mu=50.0, sigma=2))
-        self.demand[Component.CARS] = round(self.random.normalvariate(mu=20.0, sigma=2))  # aim to produce
+        self.demand[Component.PARTS] = round(self.random.normalvariate(mu=130.0, sigma=2))
+        self.demand[Component.CARS] = round(self.random.normalvariate(mu=40.0, sigma=2))  # aim to produce
         self.default_demand[Component.PARTS] = self.demand[Component.PARTS]
         # Set default demand to be equal to number of users divided by car lifetime
         self.default_demand[Component.CARS] = 1000 / car_lifetime
@@ -894,7 +894,8 @@ class Garage(GenericAgent):
     Garages repair cars, and send ELVs to dismantlers or recyclers.
     """
 
-    def __init__(self, unique_id, model, all_agents, circularity_friendliness=0.2, min_reused_parts=0.0):
+    def __init__(self, unique_id, model, all_agents, customer_base=None, circularity_friendliness=0.2,
+                 min_reused_parts=0.0):
         """
          :param circularity_friendliness:
          :param min_reused_parts: float
@@ -908,10 +909,14 @@ class Garage(GenericAgent):
         To keep track of which user a car belongs to, a garage has a dictionary with a certain car in their possession 
         as key and the corresponding user as value. This ensures giving cars back to the rightful owner.
         """
-        self.customer_base = {}
+        if customer_base is None:
+            self.customer_base = {}
+        else:
+            self.customer_base = customer_base
+
         self.circularity_friendliness = circularity_friendliness
 
-        self.stock[Component.CARS] = []
+        self.stock[Component.CARS] = [car for car in customer_base.keys()]
         self.stock[Component.PARTS] = [Part() for _ in range(20)]
         self.stock[Component.PARTS_FOR_RECYCLER] = [Part() for _ in range(10)]
         self.stock[Component.CARS_FOR_RECYCLER] = []
