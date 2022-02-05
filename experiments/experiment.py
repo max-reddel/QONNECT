@@ -177,10 +177,10 @@ if __name__ == "__main__":
     Remarks on the experiment:
     - In order to enable distributed computation, we came up with the following.
     - Each of us runs the experiment with several segment_idx values (0-7).
-          - Anmol:    0 and 1
-          - Felicity: 2 and 3
-          - Max:      4 and 5
-          - Ryan:     6 and 7
+          - Anmol:    0, 1, 2, 3
+          - Felicity: 4, 5, 6, 7
+          - Max:      8, 8, 10, 11
+          - Ryan:     12, 13, 14, 15
     - All remaining parameters stay constant.
     - Data will be saved as CSV files into the directory 'experiments/output'.
     
@@ -192,7 +192,7 @@ if __name__ == "__main__":
 
     experiment = Experiment()
     # TODO: Adjust segment_idx and run this script twice (once for each of your segment_idx')
-    experiment.run(n_replications=20, steps=50, n_segments=8, segment_idx=4)
+    experiment.run(n_replications=20, steps=50, n_segments=16, segment_idx=0)
 
     run_time = round(time.time() - start_time, 2)
     print(f'Run time: {run_time} seconds')
