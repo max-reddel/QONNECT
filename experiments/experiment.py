@@ -179,7 +179,7 @@ if __name__ == "__main__":
     - Each of us runs the experiment with several segment_idx values (0-7).
           - Anmol:    0, 1, 2, 3
           - Felicity: 4, 5, 6, 7
-          - Max:      8, 8, 10, 11
+          - Max:      8, 9, 10, 11
           - Ryan:     12, 13, 14, 15
     - All remaining parameters stay constant.
     - Data will be saved as CSV files into the directory 'experiments/output'.
