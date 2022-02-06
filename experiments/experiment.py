@@ -192,7 +192,7 @@ if __name__ == "__main__":
 
     experiment = Experiment()
     # TODO: Adjust segment_idx and run this script twice (once for each of your segment_idx')
-    experiment.run(n_replications=20, steps=50, n_segments=16, segment_idx=0)
+    experiment.run(n_replications=20, steps=50, n_segments=16, segment_idx=4)
 
     run_time = round(time.time() - start_time, 2)
     print(f'Run time: {run_time} seconds')
