@@ -164,8 +164,11 @@ The XLRM framework describes the analysis of a model by distinguishing:
 - R: Relations which describe the inner working of the model
 - M: Metrics which define the key performance indicators (KPIs)
 
-The following sub-sections describe X, L, and M in more detail.
+The following sub-sections describe X, L, and M in more detail. An overview is provided here:
 
-### 5.1 KPIs
-### 5.2 Policies
-### 5.3 Scenarios
+![image info](images/xlrm.png)
+<figcaption align = "center"><b>Fig.3 -The XLRM framework applied to the CEPAI model</b></figcaption>
+
+### 5.1 Metrics
+### 5.2 Levers
+### 5.3 Uncertainties
