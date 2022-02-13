@@ -152,7 +152,7 @@ Currenlty, everything works. But for `PARTS` and `CARS`, it's a simple way of ju
 
 Figure 2 shows what an instance of the `Car` class can look like. Additionally, we can see what a `Part` consists of. The number of parts can of course still be adjusted. 
 
-![image info](images/car_composition.png)
+![image info](images/car.png)
 <figcaption align = "center"><b>Fig.2 -The composition of cars and parts</b></figcaption>
 
 
