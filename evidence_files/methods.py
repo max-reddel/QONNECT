@@ -34,6 +34,7 @@ def get_stocks(agent):
 
     return agent_stocks
 
+
 def micro_validation(levers, uncertainities, steps=10):
     """"
     Performs micro validation using levers and uncertainties for given steps and plots agent stocks.
