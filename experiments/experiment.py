@@ -155,7 +155,6 @@ class Experiment:
         :param folder: string
         :return:
             results: dictionary with all results
-        TODO: Load all CSVs and combine them
         """
         mypath = os.getcwd() + '/output/'
         outputs = [f for f in listdir(mypath) if isfile(join(mypath, f))]
@@ -191,7 +190,7 @@ if __name__ == "__main__":
     start_time = time.time()
 
     experiment = Experiment()
-    # TODO: Adjust segment_idx and run this script twice (once for each of your segment_idx')
+    # TODO: Adjust segment_idx and run this script four times (once for each of your segment_idx')
     experiment.run(n_replications=20, steps=50, n_segments=16, segment_idx=11)
 
     run_time = round(time.time() - start_time, 2)
