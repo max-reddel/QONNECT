@@ -1,4 +1,5 @@
-'''This script has functions used for data reporting and plotting graphs in the evidence files'''
+"""This script has functions used for data reporting and plotting graphs in the evidence files."""
+
 
 import matplotlib.pyplot as plt
 import collections
@@ -10,6 +11,7 @@ from model.cepai_model import *
 def plot_results(results):
     """
     Plots the line plots for the model outputs
+    :param results: dictionary
     """
     fig, axs = plt.subplots(3, 3, sharex='True', sharey='False', figsize=(10, 10))
     columns = results.columns
@@ -24,6 +26,10 @@ def plot_results(results):
 
 
 def get_stocks(agent):
+    """
+    :param agent: Agent
+    :return: agent_stocks: dictionary
+    """
     agent_stocks = {}
 
     for comp, stocks in agent.stock.items():
@@ -34,96 +40,81 @@ def get_stocks(agent):
 
     return agent_stocks
 
+
 def micro_validation(levers, uncertainities, steps=10):
     """"
     Performs micro validation using levers and uncertainties for given steps and plots agent stocks.
     This function is taken from the calibration notebook and adapted for validation.
+    :param levers: dictionary
+    :param uncertainities: dictionary
+    :param steps: int
     """
     model = CEPAIModel(levers=levers, uncertainties=uncertainities)
 
     data = []
     for _ in range(steps):
         """
-        Collect every step of the model the values for stocks and demands of all agent classes except users and refiners and save them in a Pandas dataframe.
+        Collect every step of the model the values for stocks and demands of all agent classes except users and 
+        refiners and save them in a Pandas dataframe.
         """
         # Garages, check both demand and stock
-        i = 0
-
-        for garage in model.all_agents[Garage]:
+        for i, garage in enumerate(model.all_agents[Garage]):
             if i == 0:
                 garage_stocks = get_stocks(garage)
                 garage_demands = garage.demand
-                i += 1
             else:
                 garage_stock_to_add = get_stocks(garage)
                 garage_stocks = dict(collections.Counter(garage_stocks) + collections.Counter(garage_stock_to_add))
                 garage_demands = dict(collections.Counter(garage_demands) + collections.Counter(garage.demand))
-                i += 1
 
             garage_stocks = {k: v / i for k, v in garage_stocks.items()}
             garage_demands = {k: v / i for k, v in garage_demands.items()}
 
         # Parts manufacturers, check both demand and stock
-        i = 0
-
-        for PM in model.all_agents[PartsManufacturer]:
+        for i, PM in enumerate(model.all_agents[PartsManufacturer]):
             if i == 0:
                 PM_stocks = get_stocks(PM)
                 PM_demands = PM.demand
-                i += 1
             else:
                 PM_stock_to_add = get_stocks(PM)
                 PM_stocks = dict(collections.Counter(PM_stocks) + collections.Counter(PM_stock_to_add))
                 PM_demands = dict(collections.Counter(PM_demands) + collections.Counter(PM.demand))
-                i += 1
 
             PM_stocks = {k: v / i for k, v in PM_stocks.items()}
             PM_demands = {k: v / i for k, v in PM_demands.items()}
 
         # Car manufacturers, check both demand and stock
-        i = 0
-
-        for CM in model.all_agents[CarManufacturer]:
+        for i, CM in enumerate(model.all_agents[CarManufacturer]):
             if i == 0:
                 CM_stocks = get_stocks(CM)
                 CM_demands = CM.demand
-                i += 1
             else:
                 CM_stock_to_add = get_stocks(CM)
                 CM_stocks = dict(collections.Counter(CM_stocks) + collections.Counter(CM_stock_to_add))
                 CM_demands = dict(collections.Counter(CM_demands) + collections.Counter(CM.demand))
-                i += 1
 
             CM_stocks = {k: v / i for k, v in CM_stocks.items()}
             CM_demands = {k: v / i for k, v in CM_demands.items()}
 
         # Dismantlers, check stock
-        i = 0
-
-        for dismantler in model.all_agents[Dismantler]:
+        for i, dismantler in enumerate(model.all_agents[Dismantler]):
             if i == 0:
                 dismantler_stocks = get_stocks(dismantler)
-                i += 1
             else:
                 dismantler_stock_to_add = get_stocks(dismantler)
                 dismantler_stocks = dict(
                     collections.Counter(dismantler_stocks) + collections.Counter(dismantler_stock_to_add))
-                i += 1
 
             garage_stocks = {k: v / i for k, v in dismantler_stocks.items()}
 
         # Recyclers, check stock
-        i = 0
-
-        for recycler in model.all_agents[Recycler]:
+        for i, recycler in enumerate(model.all_agents[Recycler]):
             if i == 0:
                 recycler_stocks = get_stocks(recycler)
-                i += 1
             else:
                 recycler_stock_to_add = get_stocks(recycler)
                 recycler_stocks = dict(
                     collections.Counter(recycler_stocks) + collections.Counter(recycler_stock_to_add))
-                i += 1
 
             recycler_stocks = {k: v / i for k, v in recycler_stocks.items()}
 
