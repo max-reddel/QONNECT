@@ -21,9 +21,9 @@ The Circular Economy of Plastic in the Automotive Industry (CEPAI) Model is an a
    3. [Components](#43-components)
    4. [Cars and Parts](#44-the-composition-of-cars-and-parts)
 5. [XLRM Framework](#5-xlrm)
-   1. [KPIs](#51-kpis)
-   2. [Policies](#52-policies)
-   3. [Scenarios](#53-scenarios)
+   1. [Metrics](#51-kpis)
+   2. [Levers](#52-policies)
+   3. [Uncertainties](#53-scenarios)
     
 
 ## 1. General Remarks
