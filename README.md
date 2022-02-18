@@ -11,7 +11,7 @@ The Circular Economy of Plastic in the Automotive Industry (CEPAI) Model is an a
 ## Running the model
 
 Import the model with: 
-`from model.cepai_model import *`
+```from model.cepai_model import *```
 
 Set the parameters: 
 
